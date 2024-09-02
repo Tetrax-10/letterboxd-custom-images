@@ -14,7 +14,7 @@ All the customization this script provides is local and won't be visible to othe
 
 To open script settings, click on the tampermonkey icon in your browser and click the gear icon.
 
-![open script settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/script_settings.jpg)
+<img alt="open script settings" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/script_settings.jpg" style="width: 250px;">
 
 #### Custom Profile Backdrop
 
@@ -94,7 +94,7 @@ Letterboxd doesn't display backdrops for less popular films. So this script uses
 
 #### Screenshots of settings menu
 
-![open script settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/settings_menu.jpg)
+![settings menu](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/settings_menu.jpg)
 
 ### Todos
 
