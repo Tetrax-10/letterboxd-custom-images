@@ -14,7 +14,7 @@ All the customization this script provides is local and won't be visible to othe
 
 To open script settings, click on the tampermonkey icon in your browser and click the gear icon.
 
-![open script settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshot/script_settings.jpg)
+![open script settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/script_settings.jpg)
 
 #### Custom Profile Backdrop
 
@@ -40,7 +40,7 @@ To open script settings, click on the tampermonkey icon in your browser and clic
 
 #### Custom Film/List Backdrop
 
-1. Go to a film or list page you want to change the backdrop for and copy the film ID from the [share link](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshot/share.jpg).
+1. Go to a film or list page you want to change the backdrop for and copy the film ID from the [share link](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/share.jpg).
 2. For example, [The Florida Project (2017)](https://letterboxd.com/film/the-florida-project/)'s film ID is `dMG0`.
 3. Open the script settings and click `New Custom Backdrop`.
 4. Paste the film ID in the respective field.
@@ -91,6 +91,10 @@ Letterboxd doesn't display backdrops for less popular films. So this script uses
     </td>
   </tr>
 </table>
+
+#### Screenshots of settings menu
+
+![open script settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/settings_menu.jpg)
 
 ### Todos
 
