@@ -417,11 +417,18 @@
 
         async function scrapeFirstPosterElement(selector) {
             const firstPosterElement = await waitForElement(selector, 10000)
+            const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
+
+            const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+
+            if (customBackdrops[`f/${filmName}`]) {
+                return customBackdrops[`f/${filmName}`]
+            }
 
             return new Promise((resolve) => {
                 GM_xmlhttpRequest({
                     method: "GET",
-                    url: `https://letterboxd.com/film/${firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]}/`,
+                    url: `https://letterboxd.com/film/${filmName}/`,
                     onload: function (response) {
                         const parser = new DOMParser()
                         const dom = parser.parseFromString(response.responseText, "text/html")
