@@ -231,7 +231,7 @@
 
                 USER_AUTO_SCRAPE: GM_getValue("USER_AUTO_SCRAPE", true),
                 USER_SHORT_BACKDROP: GM_getValue("USER_SHORT_BACKDROP", false),
-                CURRENT_USER_BACKDROP_ONLY: GM_getValue("CURRENT_USER_BACKDROP_ONLY", false),
+                CURRENT_USER_BACKDROP_ONLY: GM_getValue("CURRENT_USER_BACKDROP_ONLY", true),
 
                 PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
                 PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
@@ -268,7 +268,7 @@
 
                     GM_setValue("USER_AUTO_SCRAPE", settings.USER_AUTO_SCRAPE || true)
                     GM_setValue("USER_SHORT_BACKDROP", settings.USER_SHORT_BACKDROP || false)
-                    GM_setValue("CURRENT_USER_BACKDROP_ONLY", settings.CURRENT_USER_BACKDROP_ONLY || false)
+                    GM_setValue("CURRENT_USER_BACKDROP_ONLY", settings.CURRENT_USER_BACKDROP_ONLY || true)
 
                     GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
                     GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
@@ -298,8 +298,8 @@
 
         createLabelElement("User Page:")
         createCheckboxElement("Auto scrape backdrops if unavailable for user pages", "USER_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops for user pages", "USER_SHORT_BACKDROP", true)
-        createCheckboxElement("Don't show user backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY", false)
+        createCheckboxElement("Short backdrops for user pages", "USER_SHORT_BACKDROP", false)
+        createCheckboxElement("Don't show user backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY", true)
         createSpaceComponent()
 
         createLabelElement("Person Page:")
@@ -563,7 +563,7 @@
             ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
             ?.split("=")[1]
 
-        if (GM_getValue("CURRENT_USER_BACKDROP_ONLY", false) && location.pathname.split("/")?.[1] !== loggedInAs) return
+        if (GM_getValue("CURRENT_USER_BACKDROP_ONLY", true) && location.pathname.split("/")?.[1] !== loggedInAs) return
 
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
@@ -706,13 +706,26 @@
         }
     }
 
+    async function reviewPageInjector() {
+        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+
+        const header = await commonUtils.waitForElement("#header")
+
+        const filmName = location.pathname.match(/\/film\/([^\/]+)/)?.[1]
+
+        if (customBackdrops[`f/${filmName}`]) {
+            // inject backdrop
+            commonUtils.injectBackdrop(header, customBackdrops[`f/${filmName}`], ["shortbackdropped", "-crop"])
+        }
+    }
+
     // MAIN
 
     const currentURL = location.protocol + "//" + location.hostname + location.pathname
 
     if (
         /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/.test(currentURL) &&
-        !["settings/", "films/", "lists/", "members/", "journal/", "sign-in/", "create-account/", "pro/"].some((ending) =>
+        !["/settings/", "/films/", "/lists/", "/members/", "/journal/", "/sign-in/", "/create-account/", "/pro/"].some((ending) =>
             currentURL.toLowerCase().endsWith(ending)
         )
     ) {
@@ -731,5 +744,7 @@
         )
     ) {
         personPageInjector()
+    } else if (/^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?)$/.test(currentURL)) {
+        reviewPageInjector()
     }
 })()
