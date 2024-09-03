@@ -69,17 +69,6 @@
             border-radius: 8px;
             margin-bottom: 10px;
         }
-        #lcb-settings-popup .input-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        #lcb-settings-popup .input-row input[type="text"]:first-child {
-            width: 30%;
-        }
-        #lcb-settings-popup .input-row input[type="text"]:nth-child(2) {
-            flex-grow: 1;
-        }
         #lcb-settings-popup button {
             background-color: #4caf50;
             color: white;
@@ -95,11 +84,6 @@
             justify-content: space-between;
             margin-top: 20px;
         }
-        #lcb-settings-popup .custom-backdrop-container {
-            display: flex;
-            flex-direction: column;
-        }
-        /* Custom checkbox styles */
         .lcb-checkbox-container {
             display: flex;
             align-items: center;
@@ -239,47 +223,6 @@
             popup.appendChild(space)
         }
 
-        function createCustomBackdropInput(filmId = "", url = "") {
-            const row = document.createElement("div")
-            row.className = "input-row"
-
-            // film id input
-            const filmIdInput = document.createElement("input")
-            filmIdInput.type = "text"
-            filmIdInput.placeholder = "Film/List ID"
-            filmIdInput.value = filmId
-            filmIdInput.oninput = () => updateCustomBackdrops()
-
-            // backdrop url input
-            const urlInput = document.createElement("input")
-            urlInput.type = "text"
-            urlInput.placeholder = "Backdrop URL"
-            urlInput.value = url
-            urlInput.oninput = () => updateCustomBackdrops()
-
-            // Add the new row to the container
-            row.appendChild(filmIdInput)
-            row.appendChild(urlInput)
-
-            // Prepend the new row at the top of the container
-            customBackdropContainer.insertBefore(row, customBackdropContainer.children[2])
-        }
-
-        function updateCustomBackdrops() {
-            const rows = customBackdropContainer.querySelectorAll(".input-row")
-            const customBackdrops = {}
-
-            rows.forEach((row) => {
-                const filmId = row.children[0].value.trim()
-                const url = row.children[1].value.trim()
-                if (filmId && url && !customBackdrops[filmId]) {
-                    customBackdrops[filmId] = url
-                }
-            })
-
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
-        }
-
         // Export settings to a JSON file
         function exportSettings() {
             const settings = {
@@ -356,32 +299,6 @@
         createCheckboxElement("Short backdrops for person pages", "PERSON_SHORT_BACKDROP", true)
         createSpaceComponent()
 
-        // Create a container for custom backdrop input sets
-        const customBackdropContainer = document.createElement("div")
-        customBackdropContainer.className = "custom-backdrop-container"
-
-        // Create label
-        const cblabel = document.createElement("label")
-        cblabel.textContent = "Custom Backdrops"
-        cblabel.style.marginTop = "20px"
-        customBackdropContainer.appendChild(cblabel)
-
-        // Add "New" button at the top of the custom backdrop container
-        const newButton = document.createElement("button")
-        newButton.textContent = "New Custom Backdrop"
-        newButton.onclick = () => createCustomBackdropInput()
-        customBackdropContainer.appendChild(newButton)
-
-        popup.appendChild(customBackdropContainer)
-
-        // Add existing custom backdrops in reversed order (latest on top)
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
-        Object.keys(customBackdrops)
-            .reverse() // Reverse to ensure latest entries are on top
-            .forEach((filmId) => {
-                createCustomBackdropInput(filmId, customBackdrops[filmId])
-            })
-
         // Import/Export Buttons
         const importExportContainer = document.createElement("div")
         importExportContainer.className = "import-export-container"
@@ -409,8 +326,6 @@
         document.body.appendChild(overlay)
 
         function closePopup(overlay, isSave = true) {
-            // Save the latest custom backdrop object before closing
-            if (isSave) updateCustomBackdrops()
             document.body.removeChild(overlay)
         }
     }
