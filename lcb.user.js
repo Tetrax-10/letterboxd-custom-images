@@ -159,7 +159,7 @@
         document.body.appendChild(overlay)
 
         function closePopup(overlay) {
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
+            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
             document.body.removeChild(overlay)
         }
     }
@@ -189,7 +189,10 @@
             input.type = "text"
             input.value = GM_getValue(id, "")
             input.placeholder = placeholder
-            input.oninput = (e) => GM_setValue(id, e.target.value)
+            input.oninput = (e) => {
+                const value = e.target.value?.trim()
+                GM_setValue(id, value)
+            }
             popup.appendChild(input)
         }
 
@@ -227,7 +230,7 @@
                 LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
 
                 USER_AUTO_SCRAPE: GM_getValue("USER_AUTO_SCRAPE", true),
-                USER_SHORT_BACKDROP: GM_getValue("USER_SHORT_BACKDROP", true),
+                USER_SHORT_BACKDROP: GM_getValue("USER_SHORT_BACKDROP", false),
                 CURRENT_USER_BACKDROP_ONLY: GM_getValue("CURRENT_USER_BACKDROP_ONLY", false),
 
                 PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
@@ -264,7 +267,7 @@
                     GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
 
                     GM_setValue("USER_AUTO_SCRAPE", settings.USER_AUTO_SCRAPE || true)
-                    GM_setValue("USER_SHORT_BACKDROP", settings.USER_SHORT_BACKDROP || true)
+                    GM_setValue("USER_SHORT_BACKDROP", settings.USER_SHORT_BACKDROP || false)
                     GM_setValue("CURRENT_USER_BACKDROP_ONLY", settings.CURRENT_USER_BACKDROP_ONLY || false)
 
                     GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
@@ -489,7 +492,11 @@
 
         if (customBackdrops[filmId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[filmId], GM_getValue("FILM_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(
+                header,
+                customBackdrops[filmId],
+                GM_getValue("FILM_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : []
+            )
             return
         }
 
@@ -501,10 +508,10 @@
 
             // inject backdrop
             if (backdropUrl) {
-                commonUtils.injectBackdrop(header, backdropUrl, GM_getValue("FILM_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+                commonUtils.injectBackdrop(header, backdropUrl, GM_getValue("FILM_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : [])
 
                 customBackdrops[filmId] = backdropUrl
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
             }
         }
     }
@@ -558,7 +565,11 @@
 
         if (customBackdrops[userId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[userId], GM_getValue("USER_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(
+                header,
+                customBackdrops[userId],
+                GM_getValue("USER_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : []
+            )
             return
         }
 
@@ -570,10 +581,10 @@
 
             // inject backdrop
             if (scrapedImage) {
-                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : [])
 
                 customBackdrops[userId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
             }
         }
     }
@@ -620,7 +631,7 @@
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
 
                 customBackdrops[listId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
             }
         }
     }
@@ -683,7 +694,7 @@
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
 
                 customBackdrops[personId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
             }
         }
     }
