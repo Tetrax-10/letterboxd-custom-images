@@ -13,6 +13,7 @@
 // @downloadURL  https://tetrax-10.github.io/letterboxd-custom-backdrops/lcb.user.js
 // @icon         https://tetrax-10.github.io/letterboxd-custom-backdrops/assets/icon.png
 // @run-at       document-start
+// @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -238,6 +239,7 @@
                 PROFILE_BACKDROP_URL: GM_getValue("PROFILE_BACKDROP_URL", ""),
                 TMDB_API_KEY: GM_getValue("TMDB_API_KEY", ""),
                 LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
+                LIST_AUTO_SCRAPE: GM_getValue("LIST_AUTO_SCRAPE", true),
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
@@ -263,6 +265,7 @@
                     GM_setValue("PROFILE_BACKDROP_URL", settings.PROFILE_BACKDROP_URL || "")
                     GM_setValue("TMDB_API_KEY", settings.TMDB_API_KEY || "")
                     GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
+                    GM_setValue("LIST_AUTO_SCRAPE", settings.LIST_AUTO_SCRAPE || false)
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
                     // Refresh the popup to reflect imported settings
@@ -284,6 +287,7 @@
 
         // Add the new checkbox element for "List short backdrop"
         createCheckboxElement("Short backdrops for list pages", "LIST_SHORT_BACKDROP", true)
+        createCheckboxElement("Auto scrape backdrops if unavailable for list pages", "LIST_AUTO_SCRAPE", false)
 
         // Create a container for custom backdrop input sets
         const customBackdropContainer = document.createElement("div")
@@ -393,6 +397,57 @@
             return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
         }
 
+        async function extractBackdropUrlFromLetterboxdFilmPage(dom) {
+            const filmBackdropUrl = commonUtils.isDefaultBackdropAvailable(dom)
+
+            if (!filmBackdropUrl) {
+                // get tmdb id
+                const tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
+                const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
+                const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
+
+                // get tmdb backdrop
+                return await commonUtils.getTmdbBackdrop(tmdbIdType, tmdbId)
+            }
+
+            return filmBackdropUrl
+        }
+
+        async function scrapeFirstPosterElement() {
+            const firstPosterElement = await commonUtils.waitForElement("ul.poster-list > li.poster-container a")
+
+            return new Promise((resolve) => {
+                GM_xmlhttpRequest({
+                    method: "GET",
+                    url: firstPosterElement.href,
+                    onload: function (response) {
+                        const parser = new DOMParser()
+                        const dom = parser.parseFromString(response.responseText, "text/html")
+
+                        resolve(extractBackdropUrlFromLetterboxdFilmPage(dom))
+                    },
+                    onerror: function (error) {
+                        console.error(`Can't scrape Letterboxd page: ${firstPosterElement.href}`, error)
+                        resolve(null)
+                    },
+                })
+            })
+        }
+
+        function isDefaultBackdropAvailable(dom = document) {
+            const defaultBackdropElement = dom.querySelector("#backdrop")
+            const defaultBackdropUrl =
+                defaultBackdropElement?.dataset?.backdrop2x ||
+                defaultBackdropElement?.dataset?.backdrop ||
+                defaultBackdropElement?.dataset?.backdropMobile
+
+            if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) {
+                return defaultBackdropUrl
+            }
+
+            return false
+        }
+
         function injectBackdrop(header, backdropUrl, attributes = []) {
             // get or inject backdrop containers
             const backdropContainer =
@@ -418,6 +473,8 @@
         return {
             waitForElement: waitForElement,
             getTmdbBackdrop: getTmdbBackdrop,
+            scrapeFirstPosterElement: scrapeFirstPosterElement,
+            isDefaultBackdropAvailable: isDefaultBackdropAvailable,
             injectBackdrop: injectBackdrop,
         }
     })()
@@ -441,7 +498,7 @@
         }
 
         // if original backdrop is available then return
-        if (document.querySelector(".backdrop-container")?.innerHTML.includes("https://a.ltrbxd.com/resized/sm/upload")) return
+        if (commonUtils.isDefaultBackdropAvailable()) return
 
         // get tmdb id
         const tmdbElement = await commonUtils.waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`)
@@ -469,32 +526,15 @@
         commonUtils.injectBackdrop(header, GM_getValue("PROFILE_BACKDROP_URL", ""))
     }
 
-    // async function getFirstItemTmdbId() {
-    //     const firstElement = await commonUtils.waitForElement("ul.poster-list > li.poster-container a")
-
-    //     return new Promise((resolve) => {
-    //         GM_xmlhttpRequest({
-    //             method: "GET",
-    //             url: firstElement.href,
-    //             onload: function (response) {
-    //                 const parser = new DOMParser()
-    //                 const dom = parser.parseFromString(response.responseText, "text/html")
-
-    //                 // get tmdb id
-    //                 const tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
-    //                 const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
-    //                 const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
-
-    //                 resolve([tmdbIdType, tmdbId])
-    //             },
-    //             onerror: function (error) {
-    //                 console.error(`Can't scrape Letterboxd page: ${firstElement.href}`, error)
-    //             },
-    //         })
-    //     })
-    // }
-
     async function listPageInjector() {
+        let scrapedImage = undefined
+
+        if (GM_getValue("LIST_AUTO_SCRAPE", false)) {
+            commonUtils.scrapeFirstPosterElement().then((data) => {
+                scrapedImage = data
+            })
+        }
+
         while (!document.body?.classList) {
             await new Promise((resolve) => setTimeout(resolve, 10))
         }
@@ -514,6 +554,17 @@
             commonUtils.injectBackdrop(header, customBackdrops[filmId], GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
             return
         }
+
+        // if original backdrop is available then return
+        if (commonUtils.isDefaultBackdropAvailable()) return
+
+        // wait for scraped image
+        while (scrapedImage === undefined) {
+            await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+
+        // inject backdrop
+        if (scrapedImage) commonUtils.injectBackdrop(header, scrapedImage)
     }
 
     const currentURL = location.protocol + "//" + location.hostname + location.pathname
