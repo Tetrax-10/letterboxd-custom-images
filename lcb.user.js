@@ -76,8 +76,7 @@
             margin-bottom: 10px;
         }
         #lcb-settings-popup .input-row input[type="text"]:first-child {
-            width: 20%;
-            max-width: 100px;
+            width: 30%;
         }
         #lcb-settings-popup .input-row input[type="text"]:nth-child(2) {
             flex-grow: 1;
@@ -149,10 +148,15 @@
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
 
-        function createInputElement(name, id, placeholder) {
-            // Create label
+        function createLabelElement(text) {
             const label = document.createElement("label")
-            label.textContent = name
+            label.textContent = text
+
+            popup.appendChild(label)
+        }
+
+        function createInputElement(name, id, placeholder) {
+            createLabelElement(name)
 
             // Create input element
             const input = document.createElement("input")
@@ -162,7 +166,6 @@
             input.oninput = (e) => GM_setValue(id, e.target.value)
 
             // Inject to popup
-            popup.appendChild(label)
             popup.appendChild(input)
         }
 
@@ -234,13 +237,15 @@
         // Export settings to a JSON file
         function exportSettings() {
             const settings = {
-                LETTERBOXD_USERNAME: GM_getValue("LETTERBOXD_USERNAME", ""),
-                PROFILE_BACKDROP_URL: GM_getValue("PROFILE_BACKDROP_URL", ""),
                 TMDB_API_KEY: GM_getValue("TMDB_API_KEY", ""),
                 LIST_AUTO_SCRAPE: GM_getValue("LIST_AUTO_SCRAPE", true),
                 LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
                 PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
                 PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
+                USER_AUTO_SCRAPE: GM_getValue("USER_AUTO_SCRAPE", true),
+                USER_SHORT_BACKDROP: GM_getValue("USER_SHORT_BACKDROP", true),
+                CURRENT_USER_BACKDROP_ONLY: GM_getValue("CURRENT_USER_BACKDROP_ONLY", false),
+                FILM_SHORT_BACKDROP: GM_getValue("FILM_SHORT_BACKDROP", false),
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
@@ -262,13 +267,15 @@
                 const content = e.target.result
                 try {
                     const settings = JSON.parse(content)
-                    GM_setValue("LETTERBOXD_USERNAME", settings.LETTERBOXD_USERNAME || "")
-                    GM_setValue("PROFILE_BACKDROP_URL", settings.PROFILE_BACKDROP_URL || "")
                     GM_setValue("TMDB_API_KEY", settings.TMDB_API_KEY || "")
                     GM_setValue("LIST_AUTO_SCRAPE", settings.LIST_AUTO_SCRAPE || true)
                     GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
                     GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
                     GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
+                    GM_setValue("USER_AUTO_SCRAPE", settings.USER_AUTO_SCRAPE || true)
+                    GM_setValue("USER_SHORT_BACKDROP", settings.USER_SHORT_BACKDROP || true)
+                    GM_setValue("CURRENT_USER_BACKDROP_ONLY", settings.CURRENT_USER_BACKDROP_ONLY || false)
+                    GM_setValue("FILM_SHORT_BACKDROP", settings.FILM_SHORT_BACKDROP || false)
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
                     // Refresh the popup to reflect imported settings
@@ -281,18 +288,27 @@
             reader.readAsText(file)
         }
 
-        // Add input fields for static values
-        createInputElement("Enter your Letterboxd Username:", "LETTERBOXD_USERNAME", "Your Username")
-        createInputElement("Enter your Profile Backdrop URL:", "PROFILE_BACKDROP_URL", "Your Backdrop URL")
-        createInputElement("Enter your TMDB API key:", "TMDB_API_KEY", "TMDB API Key")
-
+        // Add checkbox fields
+        createLabelElement("Film Page:")
+        createCheckboxElement("Short backdrops for film pages", "FILM_SHORT_BACKDROP", false)
+        createInputElement("Enter your TMDB API key to display missing backdrops (optional):", "TMDB_API_KEY", "TMDB API Key")
         createSpaceComponent()
 
-        // Add the new checkbox element for "List short backdrop"
+        createLabelElement("List Page:")
         createCheckboxElement("Auto scrape backdrops if unavailable for list pages", "LIST_AUTO_SCRAPE", true)
         createCheckboxElement("Short backdrops for list pages", "LIST_SHORT_BACKDROP", true)
+        createSpaceComponent()
+
+        createLabelElement("User Page:")
+        createCheckboxElement("Auto scrape backdrops if unavailable for user pages", "USER_AUTO_SCRAPE", true)
+        createCheckboxElement("Short backdrops for user pages", "USER_SHORT_BACKDROP", true)
+        createCheckboxElement("Don't show user backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY", false)
+        createSpaceComponent()
+
+        createLabelElement("Person Page:")
         createCheckboxElement("Auto scrape backdrops if unavailable for person pages", "PERSON_AUTO_SCRAPE", true)
         createCheckboxElement("Short backdrops for person pages", "PERSON_SHORT_BACKDROP", true)
+        createSpaceComponent()
 
         // Create a container for custom backdrop input sets
         const customBackdropContainer = document.createElement("div")
@@ -394,6 +410,8 @@
         }
 
         async function getTmdbBackdrop(tmdbIdType, tmdbId) {
+            if (!GM_getValue("TMDB_API_KEY", "")) return null
+
             const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${GM_getValue("TMDB_API_KEY", "")}`)
             const tmdbRes = await tmdbRawRes.json()
 
@@ -419,12 +437,12 @@
         }
 
         async function scrapeFirstPosterElement(selector) {
-            const firstPosterElement = await commonUtils.waitForElement(selector)
+            const firstPosterElement = await commonUtils.waitForElement(selector, 10000)
 
             return new Promise((resolve) => {
                 GM_xmlhttpRequest({
                     method: "GET",
-                    url: firstPosterElement.href,
+                    url: `https://letterboxd.com/film/${firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]}/`,
                     onload: function (response) {
                         const parser = new DOMParser()
                         const dom = parser.parseFromString(response.responseText, "text/html")
@@ -478,6 +496,7 @@
         return {
             waitForElement: waitForElement,
             getTmdbBackdrop: getTmdbBackdrop,
+            extractBackdropUrlFromLetterboxdFilmPage: extractBackdropUrlFromLetterboxdFilmPage,
             scrapeFirstPosterElement: scrapeFirstPosterElement,
             isDefaultBackdropAvailable: isDefaultBackdropAvailable,
             injectBackdrop: injectBackdrop,
@@ -485,42 +504,62 @@
     })()
 
     async function filmPageInjector() {
-        const header = await commonUtils.waitForElement("#header")
-
-        const filmIdElement = await commonUtils.waitForElement(`.urlgroup >input[value^="https://boxd.it/"]`)
-        const filmId = filmIdElement.value?.match(/https:\/\/boxd\.it\/([a-zA-Z0-9]+)/)?.[1] ?? null
+        const filmId = `f/${location.pathname.split("/")?.[2]}`
 
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
+        const header = await commonUtils.waitForElement("#header")
+
         if (customBackdrops[filmId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[filmId])
+            commonUtils.injectBackdrop(header, customBackdrops[filmId], GM_getValue("FILM_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
         // if original backdrop is available then return
         if (commonUtils.isDefaultBackdropAvailable()) return
 
-        // get tmdb id
-        const tmdbElement = await commonUtils.waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`)
-        const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
-        const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
+        if (GM_getValue("TMDB_API_KEY", "")) {
+            const backdropUrl = await commonUtils.extractBackdropUrlFromLetterboxdFilmPage(document)
 
-        // get backdrop
-        const backdropUrl = await commonUtils.getTmdbBackdrop(tmdbIdType, tmdbId)
-        if (!backdropUrl) return
-
-        // inject backdrop
-        commonUtils.injectBackdrop(header, backdropUrl)
+            // inject backdrop
+            if (backdropUrl) {
+                commonUtils.injectBackdrop(header, backdropUrl, GM_getValue("FILM_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            }
+        }
     }
 
     async function profilePageInjector() {
-        if (!GM_getValue("LETTERBOXD_USERNAME", "") || !GM_getValue("PROFILE_BACKDROP_URL", "")) return
+        const userId = `u/${location.pathname.split("/")?.[1]}`
+
+        const loggedInAs = document.cookie
+            ?.split("; ")
+            ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
+            ?.split("=")[1]
+
+        if (GM_getValue("CURRENT_USER_BACKDROP_ONLY", false) && location.pathname.split("/")?.[1] !== loggedInAs) return
+
+        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
 
-        // inject backdrop
-        commonUtils.injectBackdrop(header, GM_getValue("PROFILE_BACKDROP_URL", ""))
+        if (customBackdrops[userId]) {
+            // inject backdrop
+            commonUtils.injectBackdrop(header, customBackdrops[userId], GM_getValue("USER_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            return
+        }
+
+        // if original backdrop is available then return
+        if (commonUtils.isDefaultBackdropAvailable()) return
+
+        if (GM_getValue("USER_AUTO_SCRAPE", true)) {
+            const scrapedImage = await commonUtils.scrapeFirstPosterElement("#favourites .poster-list > li:first-child a")
+
+            // inject backdrop
+            if (scrapedImage) {
+                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            }
+        }
     }
 
     async function listPageInjector() {
@@ -588,14 +627,13 @@
 
     if (
         /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/.test(currentURL) &&
-        currentURL.toLowerCase().endsWith(`${GM_getValue("LETTERBOXD_USERNAME", "")}/`.toLowerCase())
+        !["settings/", "films/", "lists/", "members/", "journal/", "sign-in/", "create-account/", "pro/"].some((ending) =>
+            currentURL.toLowerCase().endsWith(ending)
+        )
     ) {
         // letterboxd your profile page
         profilePageInjector()
-    } else if (
-        /^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/.test(currentURL) &&
-        GM_getValue("TMDB_API_KEY", "")
-    ) {
+    } else if (/^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/.test(currentURL)) {
         // Letterboxd film page
         filmPageInjector()
     } else if (
