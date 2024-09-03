@@ -112,7 +112,7 @@
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
 
-        function createInputElement(name, id) {
+        function createInputElement(name, id, placeholder) {
             // Create label
             const label = document.createElement("label")
             label.textContent = name
@@ -121,6 +121,7 @@
             const input = document.createElement("input")
             input.type = "text"
             input.value = GM_getValue(id, "")
+            input.placeholder = placeholder
             input.oninput = (e) => GM_setValue(id, e.target.value)
 
             // Inject to popup
@@ -135,7 +136,7 @@
             // film id input
             const filmIdInput = document.createElement("input")
             filmIdInput.type = "text"
-            filmIdInput.placeholder = "Film ID"
+            filmIdInput.placeholder = "Film/List ID"
             filmIdInput.value = filmId
             filmIdInput.maxLength = 10 // Limit the length of Film ID input
             filmIdInput.oninput = () => updateCustomBackdrops()
@@ -213,9 +214,9 @@
         }
 
         // Add input fields for static values
-        createInputElement("Enter your Letterboxd Username:", "LETTERBOXD_USERNAME")
-        createInputElement("Enter your Profile Backdrop URL:", "PROFILE_BACKDROP_URL")
-        createInputElement("Enter your TMDB API key:", "TMDB_API_KEY")
+        createInputElement("Enter your Letterboxd Username:", "LETTERBOXD_USERNAME", "Your Username")
+        createInputElement("Enter your Profile Backdrop URL:", "PROFILE_BACKDROP_URL", "Your Backdrop URL")
+        createInputElement("Enter your TMDB API key:", "TMDB_API_KEY", "TMDB API Key")
 
         // Create a container for custom backdrop input sets
         const customBackdropContainer = document.createElement("div")
