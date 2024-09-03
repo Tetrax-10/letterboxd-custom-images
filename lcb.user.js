@@ -99,7 +99,43 @@
         #lcb-settings-popup .custom-backdrop-container {
             display: flex;
             flex-direction: column;
-        }`)
+        }
+        /* Custom checkbox styles */
+        .lcb-checkbox-container {
+            display: flex;
+            align-items: center;
+        }
+        .lcb-checkbox-container input[type="checkbox"] {
+            appearance: none;
+            background-color: #20242c;
+            border: 1px solid #cfcfcf;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            position: relative;
+            margin-right: 10px;
+            outline: none;
+        }
+        .lcb-checkbox-container input[type="checkbox"]:checked {
+            background-color: #4caf50;
+            border: none;
+        }
+        .lcb-checkbox-container input[type="checkbox"]:checked::after {
+            content: '\\2714'; /* Unicode checkmark */
+            color: white;
+            font-size: 1em;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .lcb-checkbox-container label {
+            color: #cfcfcf;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        `)
 
         // Create overlay
         const overlay = document.createElement("div")
@@ -127,6 +163,30 @@
             // Inject to popup
             popup.appendChild(label)
             popup.appendChild(input)
+        }
+
+        function createCheckboxElement(labelText, id, defaultValue = false) {
+            const container = document.createElement("div")
+            container.className = "lcb-checkbox-container"
+
+            const checkbox = document.createElement("input")
+            checkbox.type = "checkbox"
+            checkbox.checked = GM_getValue(id, defaultValue)
+            checkbox.onchange = (e) => GM_setValue(id, e.target.checked)
+
+            const label = document.createElement("label")
+            label.textContent = labelText
+
+            container.appendChild(checkbox)
+            container.appendChild(label)
+
+            popup.appendChild(container)
+        }
+
+        function createSpaceComponent() {
+            const space = document.createElement("div")
+            space.style.marginBottom = "10px"
+            popup.appendChild(space)
         }
 
         function createCustomBackdropInput(filmId = "", url = "") {
@@ -177,6 +237,7 @@
                 LETTERBOXD_USERNAME: GM_getValue("LETTERBOXD_USERNAME", ""),
                 PROFILE_BACKDROP_URL: GM_getValue("PROFILE_BACKDROP_URL", ""),
                 TMDB_API_KEY: GM_getValue("TMDB_API_KEY", ""),
+                LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
@@ -201,6 +262,7 @@
                     GM_setValue("LETTERBOXD_USERNAME", settings.LETTERBOXD_USERNAME || "")
                     GM_setValue("PROFILE_BACKDROP_URL", settings.PROFILE_BACKDROP_URL || "")
                     GM_setValue("TMDB_API_KEY", settings.TMDB_API_KEY || "")
+                    GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
                     // Refresh the popup to reflect imported settings
@@ -217,6 +279,11 @@
         createInputElement("Enter your Letterboxd Username:", "LETTERBOXD_USERNAME", "Your Username")
         createInputElement("Enter your Profile Backdrop URL:", "PROFILE_BACKDROP_URL", "Your Backdrop URL")
         createInputElement("Enter your TMDB API key:", "TMDB_API_KEY", "TMDB API Key")
+
+        createSpaceComponent()
+
+        // Add the new checkbox element for "List short backdrop"
+        createCheckboxElement("Short backdrops for list pages", "LIST_SHORT_BACKDROP", true)
 
         // Create a container for custom backdrop input sets
         const customBackdropContainer = document.createElement("div")
@@ -434,6 +501,9 @@
 
         const header = await commonUtils.waitForElement("#header")
 
+        // remove short backdrop classnames for non custom backrop list pages
+        if (!GM_getValue("LIST_SHORT_BACKDROP", true)) document.body.classList.remove("shortbackdropped", "crop")
+
         const filmIdElement = await commonUtils.waitForElement(`.urlgroup >input[value^="https://boxd.it/"]`)
         const filmId = filmIdElement.value?.match(/https:\/\/boxd\.it\/([a-zA-Z0-9]+)/)?.[1] ?? null
 
@@ -441,7 +511,7 @@
 
         if (customBackdrops[filmId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[filmId], ["shortbackdropped", "-crop"])
+            commonUtils.injectBackdrop(header, customBackdrops[filmId], GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
             return
         }
     }
