@@ -12,7 +12,7 @@ All the customization this script provides is local and won't be visible to othe
 
 ## Usage
 
-To open script settings, click on the tampermonkey icon in your browser and click the gear icon.
+To open script settings, click on the tampermonkey icon in your browser and click the gear icon. The gear icon will only appear if you are in a [letterboxd page](https://letterboxd.com/).
 
 <img alt="open script settings" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/script_settings.jpg" style="width: 250px;">
 
