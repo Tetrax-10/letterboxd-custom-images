@@ -21,10 +21,9 @@
 // ==/UserScript==
 
 ;(() => {
-    GM_registerMenuCommand("Settings", showPopup)
+    GM_registerMenuCommand("Settings", showSettingsPopup)
 
-    function showPopup() {
-        GM_addStyle(`
+    GM_addStyle(`
         #lcb-settings-overlay {
             position: fixed;
             top: 0;
@@ -137,6 +136,53 @@
         }
         `)
 
+    function showImageUrlPopup(itemId) {
+        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+
+        // Create overlay
+        const overlay = document.createElement("div")
+        overlay.id = "lcb-settings-overlay"
+        overlay.onclick = (e) => {
+            if (e.target === overlay) closePopup(overlay)
+        }
+
+        // Popup element
+        const popup = document.createElement("div")
+        popup.id = "lcb-settings-popup"
+
+        const label = document.createElement("label")
+        label.textContent = "Enter Backdrop Image URL:"
+        popup.appendChild(label)
+
+        // Create input element
+        const input = document.createElement("input")
+        input.type = "text"
+        input.value = customBackdrops[itemId] ?? ""
+        input.placeholder = "Backdrop Image URL"
+        input.oninput = (e) => {
+            const value = e.target.value?.trim()
+
+            if (value) {
+                customBackdrops[itemId] = value
+            } else {
+                delete customBackdrops[itemId]
+            }
+        }
+
+        // Inject to popup
+        popup.appendChild(input)
+
+        // Inject the popup and overlay into the document
+        overlay.appendChild(popup)
+        document.body.appendChild(overlay)
+
+        function closePopup(overlay) {
+            GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
+            document.body.removeChild(overlay)
+        }
+    }
+
+    function showSettingsPopup() {
         // Create overlay
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
@@ -280,7 +326,7 @@
 
                     // Refresh the popup to reflect imported settings
                     closePopup(overlay, false)
-                    showPopup()
+                    showSettingsPopup()
                 } catch (err) {
                     alert("Failed to import settings: Invalid JSON file.")
                 }
@@ -503,12 +549,27 @@
         }
     })()
 
+    async function filmPageContextMenuInjector(filmId) {
+        const panelRateElement = await commonUtils.waitForElement("li.panel-rate")
+
+        const setFilmBackdropMenu = document.createElement("li")
+
+        const anchor = document.createElement("a")
+        anchor.textContent = "Set film backdrop"
+        anchor.style.cursor = "pointer"
+        anchor.onclick = () => showImageUrlPopup(filmId)
+
+        setFilmBackdropMenu.appendChild(anchor)
+        panelRateElement.parentNode.insertBefore(setFilmBackdropMenu, panelRateElement.nextSibling)
+    }
+
     async function filmPageInjector() {
         const filmId = `f/${location.pathname.split("/")?.[2]}`
 
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
+        filmPageContextMenuInjector(filmId)
 
         if (customBackdrops[filmId]) {
             // inject backdrop
@@ -529,6 +590,38 @@
         }
     }
 
+    async function profilePageContextMenuInjector(userId) {
+        const copyLinkMenu = await commonUtils.waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 5000)
+
+        const setProfileBackdropMenu = document.createElement("div")
+        setProfileBackdropMenu.classList.add("menuitem", "-trigger", "-has-icon", "js-menuitem")
+        setProfileBackdropMenu.role = "none"
+
+        const setProfileBackdropMenuButton = document.createElement("button")
+        setProfileBackdropMenuButton.type = "button"
+        setProfileBackdropMenuButton.role = "menuitem"
+        setProfileBackdropMenuButton.setAttribute("data-dismiss", "dropdown")
+        setProfileBackdropMenuButton.onclick = () => showImageUrlPopup(userId)
+
+        setProfileBackdropMenuButton.innerHTML = `
+            <svg class="glyph" role="presentation" width="8" height="8" viewBox="0 0 16 16" style="margin-bottom: 6px">
+                <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
+                    <g id="Icon-Set" sketch:type="MSLayerGroup" transform="translate(-360.000000, -99.000000)" fill="currentColor">
+                        <path
+                            d="M368,109 C366.896,109 366,108.104 366,107 C366,105.896 366.896,105 368,105 C369.104,105 370,105.896 370,107 C370,108.104 369.104,109 368,109 L368,109 Z M368,103 C365.791,103 364,104.791 364,107 C364,109.209 365.791,111 368,111 C370.209,111 372,109.209 372,107 C372,104.791 370.209,103 368,103 L368,103 Z M390,116.128 L384,110 L374.059,120.111 L370,116 L362,123.337 L362,103 C362,101.896 362.896,101 364,101 L388,101 C389.104,101 390,101.896 390,103 L390,116.128 L390,116.128 Z M390,127 C390,128.104 389.104,129 388,129 L382.832,129 L375.464,121.535 L384,112.999 L390,118.999 L390,127 L390,127 Z M364,129 C362.896,129 362,128.104 362,127 L362,126.061 L369.945,118.945 L380.001,129 L364,129 L364,129 Z M388,99 L364,99 C361.791,99 360,100.791 360,103 L360,127 C360,129.209 361.791,131 364,131 L388,131 C390.209,131 392,129.209 392,127 L392,103 C392,100.791 390.209,99 388,99 L388,99 Z"
+                            id="image-picture"
+                            sketch:type="MSShapeGroup"
+                        ></path>
+                    </g>
+                </g>
+            </svg>
+            <span class="label">Set profile backdrop</span>
+            `
+
+        setProfileBackdropMenu.appendChild(setProfileBackdropMenuButton)
+        copyLinkMenu.parentNode.insertBefore(setProfileBackdropMenu, copyLinkMenu.nextSibling)
+    }
+
     async function profilePageInjector() {
         const userId = `u/${location.pathname.split("/")?.[1]}`
 
@@ -542,6 +635,7 @@
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
+        profilePageContextMenuInjector(userId)
 
         if (customBackdrops[userId]) {
             // inject backdrop
@@ -562,12 +656,27 @@
         }
     }
 
+    async function listPageContextMenuInjector(listId) {
+        const panelRateElement = await commonUtils.waitForElement("li.like-link-target")
+
+        const setListBackdropMenu = document.createElement("li")
+
+        const anchor = document.createElement("a")
+        anchor.textContent = "Set list backdrop"
+        anchor.style.cursor = "pointer"
+        anchor.onclick = () => showImageUrlPopup(listId)
+
+        setListBackdropMenu.appendChild(anchor)
+        panelRateElement.parentNode.insertBefore(setListBackdropMenu, panelRateElement.nextSibling)
+    }
+
     async function listPageInjector() {
         const listId = `l/${location.pathname.split("/")?.[1]}/${location.pathname.split("/")?.[3]}`
 
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
+        listPageContextMenuInjector(listId)
 
         // remove short backdrop classnames for non custom backrop list pages
         if (!GM_getValue("LIST_SHORT_BACKDROP", true)) document.body.classList.remove("shortbackdropped", "-crop")
@@ -591,12 +700,42 @@
         }
     }
 
+    async function personPageContextMenuInjector(personId) {
+        const personImageElement = await commonUtils.waitForElement(".person-image")
+
+        // Create the button element
+        const setPersonBackdropButton = document.createElement("button")
+
+        // Set the attributes and styles
+        setPersonBackdropButton.style.borderRadius = "4px"
+        setPersonBackdropButton.style.width = "100%"
+        setPersonBackdropButton.style.border = "1px solid hsla(0,0%,100%,0.25)"
+        setPersonBackdropButton.style.backgroundColor = "transparent"
+        setPersonBackdropButton.style.color = "#9ab"
+        setPersonBackdropButton.style.height = "40px"
+        setPersonBackdropButton.style.cursor = "pointer"
+        setPersonBackdropButton.style.fontFamily = "Graphik-Regular-Web, sans-serif"
+        setPersonBackdropButton.textContent = "Set person backdrop"
+
+        setPersonBackdropButton.addEventListener("mouseenter", () => {
+            setPersonBackdropButton.style.color = "#def"
+        })
+        setPersonBackdropButton.addEventListener("mouseleave", () => {
+            setPersonBackdropButton.style.color = "#9ab"
+        })
+
+        setPersonBackdropButton.onclick = () => showImageUrlPopup(personId)
+
+        personImageElement.parentNode.insertBefore(setPersonBackdropButton, personImageElement.nextSibling)
+    }
+
     async function personPageInjector() {
         const personId = `p/${location.pathname.split("/")?.[2]}`
 
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
+        personPageContextMenuInjector(personId)
 
         if (customBackdrops[personId]) {
             // inject backdrop
