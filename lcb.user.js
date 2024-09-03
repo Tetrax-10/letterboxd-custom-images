@@ -199,7 +199,6 @@
             filmIdInput.type = "text"
             filmIdInput.placeholder = "Film/List ID"
             filmIdInput.value = filmId
-            filmIdInput.maxLength = 10 // Limit the length of Film ID input
             filmIdInput.oninput = () => updateCustomBackdrops()
 
             // backdrop url input
@@ -238,8 +237,10 @@
                 LETTERBOXD_USERNAME: GM_getValue("LETTERBOXD_USERNAME", ""),
                 PROFILE_BACKDROP_URL: GM_getValue("PROFILE_BACKDROP_URL", ""),
                 TMDB_API_KEY: GM_getValue("TMDB_API_KEY", ""),
-                LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
                 LIST_AUTO_SCRAPE: GM_getValue("LIST_AUTO_SCRAPE", true),
+                LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
+                PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
+                PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
@@ -264,8 +265,10 @@
                     GM_setValue("LETTERBOXD_USERNAME", settings.LETTERBOXD_USERNAME || "")
                     GM_setValue("PROFILE_BACKDROP_URL", settings.PROFILE_BACKDROP_URL || "")
                     GM_setValue("TMDB_API_KEY", settings.TMDB_API_KEY || "")
+                    GM_setValue("LIST_AUTO_SCRAPE", settings.LIST_AUTO_SCRAPE || true)
                     GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
-                    GM_setValue("LIST_AUTO_SCRAPE", settings.LIST_AUTO_SCRAPE || false)
+                    GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
+                    GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
                     // Refresh the popup to reflect imported settings
@@ -286,8 +289,10 @@
         createSpaceComponent()
 
         // Add the new checkbox element for "List short backdrop"
+        createCheckboxElement("Auto scrape backdrops if unavailable for list pages", "LIST_AUTO_SCRAPE", true)
         createCheckboxElement("Short backdrops for list pages", "LIST_SHORT_BACKDROP", true)
-        createCheckboxElement("Auto scrape backdrops if unavailable for list pages", "LIST_AUTO_SCRAPE", false)
+        createCheckboxElement("Auto scrape backdrops if unavailable for person pages", "PERSON_AUTO_SCRAPE", true)
+        createCheckboxElement("Short backdrops for person pages", "PERSON_SHORT_BACKDROP", true)
 
         // Create a container for custom backdrop input sets
         const customBackdropContainer = document.createElement("div")
@@ -413,8 +418,8 @@
             return filmBackdropUrl
         }
 
-        async function scrapeFirstPosterElement() {
-            const firstPosterElement = await commonUtils.waitForElement("ul.poster-list > li.poster-container a")
+        async function scrapeFirstPosterElement(selector) {
+            const firstPosterElement = await commonUtils.waitForElement(selector)
 
             return new Promise((resolve) => {
                 GM_xmlhttpRequest({
@@ -529,8 +534,8 @@
     async function listPageInjector() {
         let scrapedImage = undefined
 
-        if (GM_getValue("LIST_AUTO_SCRAPE", false)) {
-            commonUtils.scrapeFirstPosterElement().then((data) => {
+        if (GM_getValue("LIST_AUTO_SCRAPE", true)) {
+            commonUtils.scrapeFirstPosterElement(".poster-list > li:first-child a").then((data) => {
                 scrapedImage = data
             })
         }
@@ -564,7 +569,39 @@
         }
 
         // inject backdrop
-        if (scrapedImage) commonUtils.injectBackdrop(header, scrapedImage)
+        if (scrapedImage) {
+            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+        }
+    }
+
+    async function personPageInjector() {
+        const filmId = `p/${location.pathname.split("/")?.[2]}`
+
+        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+
+        const header = await commonUtils.waitForElement("#header")
+
+        if (customBackdrops[filmId]) {
+            // inject backdrop
+            commonUtils.injectBackdrop(
+                header,
+                customBackdrops[filmId],
+                GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : []
+            )
+            return
+        }
+
+        // if original backdrop is available then return
+        if (commonUtils.isDefaultBackdropAvailable()) return
+
+        if (GM_getValue("PERSON_AUTO_SCRAPE", true)) {
+            scrapedImage = await commonUtils.scrapeFirstPosterElement(".grid > li:first-child a")
+
+            // inject backdrop
+            if (scrapedImage) {
+                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            }
+        }
     }
 
     const currentURL = location.protocol + "//" + location.hostname + location.pathname
@@ -581,8 +618,19 @@
     ) {
         // Letterboxd film page
         filmPageInjector()
-    } else if (/^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+\/?)$/.test(currentURL)) {
+    } else if (
+        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail)\/[A-Za-z0-9-_\/]+)?\/(?:detail\/?)?)$/.test(
+            currentURL
+        )
+    ) {
         // Letterboxd list page
         listPageInjector()
+    } else if (
+        /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on)\/[A-Za-z0-9-_\/]+)?\/?)$/.test(
+            currentURL
+        )
+    ) {
+        // Letterboxd list page
+        personPageInjector()
     }
 })()
