@@ -586,6 +586,8 @@
             // inject backdrop
             if (backdropUrl) {
                 commonUtils.injectBackdrop(header, backdropUrl, GM_getValue("FILM_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+                customBackdrops[filmId] = backdropUrl
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
         }
     }
@@ -652,6 +654,8 @@
             // inject backdrop
             if (scrapedImage) {
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+                customBackdrops[userId] = scrapedImage
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
         }
     }
@@ -696,6 +700,8 @@
             // inject backdrop
             if (scrapedImage) {
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+                customBackdrops[listId] = scrapedImage
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
         }
     }
@@ -756,6 +762,8 @@
             // inject backdrop
             if (scrapedImage) {
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+                customBackdrops[personId] = scrapedImage
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
         }
     }
