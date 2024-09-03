@@ -123,7 +123,7 @@
     function showImageUrlPopup(itemId) {
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
-        // Create overlay
+        // Create overlay element
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
         overlay.onclick = (e) => {
@@ -134,6 +134,7 @@
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
 
+        // Create label element
         const label = document.createElement("label")
         label.textContent = "Enter Backdrop Image URL:"
         popup.appendChild(label)
@@ -152,11 +153,8 @@
                 delete customBackdrops[itemId]
             }
         }
-
-        // Inject to popup
         popup.appendChild(input)
 
-        // Inject the popup and overlay into the document
         overlay.appendChild(popup)
         document.body.appendChild(overlay)
 
@@ -167,7 +165,7 @@
     }
 
     function showSettingsPopup() {
-        // Create overlay
+        // Create overlay element
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
         overlay.onclick = (e) => {
@@ -181,21 +179,17 @@
         function createLabelElement(text) {
             const label = document.createElement("label")
             label.textContent = text
-
             popup.appendChild(label)
         }
 
         function createInputElement(name, id, placeholder) {
             createLabelElement(name)
 
-            // Create input element
             const input = document.createElement("input")
             input.type = "text"
             input.value = GM_getValue(id, "")
             input.placeholder = placeholder
             input.oninput = (e) => GM_setValue(id, e.target.value)
-
-            // Inject to popup
             popup.appendChild(input)
         }
 
@@ -207,11 +201,10 @@
             checkbox.type = "checkbox"
             checkbox.checked = GM_getValue(id, defaultValue)
             checkbox.onchange = (e) => GM_setValue(id, e.target.checked)
+            container.appendChild(checkbox)
 
             const label = document.createElement("label")
             label.textContent = labelText
-
-            container.appendChild(checkbox)
             container.appendChild(label)
 
             popup.appendChild(container)
@@ -227,16 +220,23 @@
         function exportSettings() {
             const settings = {
                 TMDB_API_KEY: GM_getValue("TMDB_API_KEY", ""),
+
+                FILM_SHORT_BACKDROP: GM_getValue("FILM_SHORT_BACKDROP", false),
+
                 LIST_AUTO_SCRAPE: GM_getValue("LIST_AUTO_SCRAPE", true),
                 LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
-                PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
-                PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
+
                 USER_AUTO_SCRAPE: GM_getValue("USER_AUTO_SCRAPE", true),
                 USER_SHORT_BACKDROP: GM_getValue("USER_SHORT_BACKDROP", true),
                 CURRENT_USER_BACKDROP_ONLY: GM_getValue("CURRENT_USER_BACKDROP_ONLY", false),
-                FILM_SHORT_BACKDROP: GM_getValue("FILM_SHORT_BACKDROP", false),
+
+                PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
+                PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
+
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
+
+            // Create a data URL for the JSON file
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
             const downloadAnchor = document.createElement("a")
             downloadAnchor.setAttribute("href", dataStr)
@@ -257,18 +257,23 @@
                 try {
                     const settings = JSON.parse(content)
                     GM_setValue("TMDB_API_KEY", settings.TMDB_API_KEY || "")
+
+                    GM_setValue("FILM_SHORT_BACKDROP", settings.FILM_SHORT_BACKDROP || false)
+
                     GM_setValue("LIST_AUTO_SCRAPE", settings.LIST_AUTO_SCRAPE || true)
                     GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
-                    GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
-                    GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
+
                     GM_setValue("USER_AUTO_SCRAPE", settings.USER_AUTO_SCRAPE || true)
                     GM_setValue("USER_SHORT_BACKDROP", settings.USER_SHORT_BACKDROP || true)
                     GM_setValue("CURRENT_USER_BACKDROP_ONLY", settings.CURRENT_USER_BACKDROP_ONLY || false)
-                    GM_setValue("FILM_SHORT_BACKDROP", settings.FILM_SHORT_BACKDROP || false)
+
+                    GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
+                    GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
+
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
                     // Refresh the popup to reflect imported settings
-                    closePopup(overlay, false)
+                    closePopup(overlay)
                     showSettingsPopup()
                 } catch (err) {
                     alert("Failed to import settings: Invalid JSON file.")
@@ -321,11 +326,10 @@
         importExportContainer.appendChild(importButton)
         popup.appendChild(importExportContainer)
 
-        // Inject the popup and overlay into the document
         overlay.appendChild(popup)
         document.body.appendChild(overlay)
 
-        function closePopup(overlay, isSave = true) {
+        function closePopup(overlay) {
             document.body.removeChild(overlay)
         }
     }
@@ -381,8 +385,19 @@
             return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
         }
 
+        function isDefaultBackdropAvailable(dom = document) {
+            const defaultBackdropElement = dom.querySelector("#backdrop")
+            const defaultBackdropUrl =
+                defaultBackdropElement?.dataset?.backdrop2x ||
+                defaultBackdropElement?.dataset?.backdrop ||
+                defaultBackdropElement?.dataset?.backdropMobile
+
+            if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) return defaultBackdropUrl
+            return false
+        }
+
         async function extractBackdropUrlFromLetterboxdFilmPage(dom) {
-            const filmBackdropUrl = commonUtils.isDefaultBackdropAvailable(dom)
+            const filmBackdropUrl = isDefaultBackdropAvailable(dom)
 
             if (!filmBackdropUrl) {
                 // get tmdb id
@@ -391,14 +406,14 @@
                 const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
                 // get tmdb backdrop
-                return await commonUtils.getTmdbBackdrop(tmdbIdType, tmdbId)
+                return await getTmdbBackdrop(tmdbIdType, tmdbId)
             }
 
             return filmBackdropUrl
         }
 
         async function scrapeFirstPosterElement(selector) {
-            const firstPosterElement = await commonUtils.waitForElement(selector, 10000)
+            const firstPosterElement = await waitForElement(selector, 10000)
 
             return new Promise((resolve) => {
                 GM_xmlhttpRequest({
@@ -416,20 +431,6 @@
                     },
                 })
             })
-        }
-
-        function isDefaultBackdropAvailable(dom = document) {
-            const defaultBackdropElement = dom.querySelector("#backdrop")
-            const defaultBackdropUrl =
-                defaultBackdropElement?.dataset?.backdrop2x ||
-                defaultBackdropElement?.dataset?.backdrop ||
-                defaultBackdropElement?.dataset?.backdropMobile
-
-            if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) {
-                return defaultBackdropUrl
-            }
-
-            return false
         }
 
         function injectBackdrop(header, backdropUrl, attributes = []) {
@@ -473,8 +474,8 @@
         anchor.textContent = "Set film backdrop"
         anchor.style.cursor = "pointer"
         anchor.onclick = () => showImageUrlPopup(filmId)
-
         setFilmBackdropMenu.appendChild(anchor)
+
         panelRateElement.parentNode.insertBefore(setFilmBackdropMenu, panelRateElement.nextSibling)
     }
 
@@ -501,6 +502,7 @@
             // inject backdrop
             if (backdropUrl) {
                 commonUtils.injectBackdrop(header, backdropUrl, GM_getValue("FILM_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+
                 customBackdrops[filmId] = backdropUrl
                 GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
@@ -508,7 +510,7 @@
     }
 
     async function profilePageContextMenuInjector(userId) {
-        const copyLinkMenu = await commonUtils.waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 5000)
+        const copyLinkMenu = await commonUtils.waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`)
 
         const setProfileBackdropMenu = document.createElement("div")
         setProfileBackdropMenu.classList.add("menuitem", "-trigger", "-has-icon", "js-menuitem")
@@ -569,6 +571,7 @@
             // inject backdrop
             if (scrapedImage) {
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+
                 customBackdrops[userId] = scrapedImage
                 GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
@@ -584,8 +587,8 @@
         anchor.textContent = "Set list backdrop"
         anchor.style.cursor = "pointer"
         anchor.onclick = () => showImageUrlPopup(listId)
-
         setListBackdropMenu.appendChild(anchor)
+
         panelRateElement.parentNode.insertBefore(setListBackdropMenu, panelRateElement.nextSibling)
     }
 
@@ -615,6 +618,7 @@
             // inject backdrop
             if (scrapedImage) {
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+
                 customBackdrops[listId] = scrapedImage
                 GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
@@ -677,6 +681,7 @@
             // inject backdrop
             if (scrapedImage) {
                 commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+
                 customBackdrops[personId] = scrapedImage
                 GM_setValue("CUSTOM_BACKDROPS", customBackdrops)
             }
@@ -693,24 +698,20 @@
             currentURL.toLowerCase().endsWith(ending)
         )
     ) {
-        // letterboxd your profile page
         profilePageInjector()
     } else if (/^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/.test(currentURL)) {
-        // Letterboxd film page
         filmPageInjector()
     } else if (
-        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail)\/[A-Za-z0-9-_\/]+)?\/(?:detail\/?)?)$/.test(
+        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:detail\/?)?)$/.test(
             currentURL
         )
     ) {
-        // Letterboxd list page
         listPageInjector()
     } else if (
-        /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on)\/[A-Za-z0-9-_\/]+)?\/?)$/.test(
+        /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/?)$/.test(
             currentURL
         )
     ) {
-        // Letterboxd list page
         personPageInjector()
     }
 })()
