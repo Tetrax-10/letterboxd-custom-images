@@ -485,10 +485,6 @@
     })()
 
     async function filmPageInjector() {
-        while (!document.body?.classList) {
-            await new Promise((resolve) => setTimeout(resolve, 10))
-        }
-
         const header = await commonUtils.waitForElement("#header")
 
         const filmIdElement = await commonUtils.waitForElement(`.urlgroup >input[value^="https://boxd.it/"]`)
@@ -521,10 +517,6 @@
     async function profilePageInjector() {
         if (!GM_getValue("LETTERBOXD_USERNAME", "") || !GM_getValue("PROFILE_BACKDROP_URL", "")) return
 
-        while (!document.body?.classList) {
-            await new Promise((resolve) => setTimeout(resolve, 10))
-        }
-
         const header = await commonUtils.waitForElement("#header")
 
         // inject backdrop
@@ -532,60 +524,46 @@
     }
 
     async function listPageInjector() {
-        let scrapedImage = undefined
+        const listId = `l/${location.pathname.split("/")?.[1]}/${location.pathname.split("/")?.[3]}`
 
-        if (GM_getValue("LIST_AUTO_SCRAPE", true)) {
-            commonUtils.scrapeFirstPosterElement(".poster-list > li:first-child a").then((data) => {
-                scrapedImage = data
-            })
-        }
-
-        while (!document.body?.classList) {
-            await new Promise((resolve) => setTimeout(resolve, 10))
-        }
+        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
 
         // remove short backdrop classnames for non custom backrop list pages
-        if (!GM_getValue("LIST_SHORT_BACKDROP", true)) document.body.classList.remove("shortbackdropped", "crop")
+        if (!GM_getValue("LIST_SHORT_BACKDROP", true)) document.body.classList.remove("shortbackdropped", "-crop")
 
-        const filmIdElement = await commonUtils.waitForElement(`.urlgroup >input[value^="https://boxd.it/"]`)
-        const filmId = filmIdElement.value?.match(/https:\/\/boxd\.it\/([a-zA-Z0-9]+)/)?.[1] ?? null
-
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
-
-        if (customBackdrops[filmId]) {
+        if (customBackdrops[listId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[filmId], GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(header, customBackdrops[listId], GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
         // if original backdrop is available then return
         if (commonUtils.isDefaultBackdropAvailable()) return
 
-        // wait for scraped image
-        while (scrapedImage === undefined) {
-            await new Promise((resolve) => setTimeout(resolve, 10))
-        }
+        if (GM_getValue("LIST_AUTO_SCRAPE", true)) {
+            const scrapedImage = await commonUtils.scrapeFirstPosterElement(".poster-list > li:first-child a")
 
-        // inject backdrop
-        if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            // inject backdrop
+            if (scrapedImage) {
+                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            }
         }
     }
 
     async function personPageInjector() {
-        const filmId = `p/${location.pathname.split("/")?.[2]}`
+        const personId = `p/${location.pathname.split("/")?.[2]}`
 
         const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
         const header = await commonUtils.waitForElement("#header")
 
-        if (customBackdrops[filmId]) {
+        if (customBackdrops[personId]) {
             // inject backdrop
             commonUtils.injectBackdrop(
                 header,
-                customBackdrops[filmId],
+                customBackdrops[personId],
                 GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : []
             )
             return
@@ -595,7 +573,7 @@
         if (commonUtils.isDefaultBackdropAvailable()) return
 
         if (GM_getValue("PERSON_AUTO_SCRAPE", true)) {
-            scrapedImage = await commonUtils.scrapeFirstPosterElement(".grid > li:first-child a")
+            const scrapedImage = await commonUtils.scrapeFirstPosterElement(".grid > li:first-child a")
 
             // inject backdrop
             if (scrapedImage) {
@@ -603,6 +581,8 @@
             }
         }
     }
+
+    // MAIN
 
     const currentURL = location.protocol + "//" + location.hostname + location.pathname
 
