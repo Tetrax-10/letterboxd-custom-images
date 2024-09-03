@@ -144,6 +144,7 @@
         input.type = "text"
         input.value = customBackdrops[itemId] ?? ""
         input.placeholder = "Backdrop Image URL"
+        input.autofocus = true
         input.oninput = (e) => {
             const value = e.target.value?.trim()
 
@@ -157,6 +158,10 @@
 
         overlay.appendChild(popup)
         document.body.appendChild(overlay)
+
+        setTimeout(() => {
+            input.focus()
+        }, 100)
 
         function closePopup(overlay) {
             GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
@@ -236,6 +241,8 @@
                 PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
                 PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
 
+                REVIEW_AUTO_SCRAPE: GM_getValue("REVIEW_AUTO_SCRAPE", false),
+
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
 
@@ -273,6 +280,8 @@
                     GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
                     GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
 
+                    GM_setValue("REVIEW_AUTO_SCRAPE", settings.REVIEW_AUTO_SCRAPE || false)
+
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
                     // Refresh the popup to reflect imported settings
@@ -305,6 +314,10 @@
         createLabelElement("Person Page:")
         createCheckboxElement("Auto scrape backdrops if unavailable for person pages", "PERSON_AUTO_SCRAPE", true)
         createCheckboxElement("Short backdrops for person pages", "PERSON_SHORT_BACKDROP", true)
+        createSpaceComponent()
+
+        createLabelElement("Review Page:")
+        createCheckboxElement("Auto scrape backdrops if unavailable for review pages", "REVIEW_AUTO_SCRAPE", false)
         createSpaceComponent()
 
         // Import/Export Buttons
@@ -712,10 +725,27 @@
         const header = await commonUtils.waitForElement("#header")
 
         const filmName = location.pathname.match(/\/film\/([^\/]+)/)?.[1]
+        const filmId = `f/${filmName}`
 
-        if (customBackdrops[`f/${filmName}`]) {
+        if (customBackdrops[filmId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[`f/${filmName}`], ["shortbackdropped", "-crop"])
+            commonUtils.injectBackdrop(header, customBackdrops[filmId], ["shortbackdropped", "-crop"])
+            return
+        }
+
+        // if original backdrop is available then return
+        if (commonUtils.isDefaultBackdropAvailable()) return
+
+        if (GM_getValue("REVIEW_AUTO_SCRAPE", false)) {
+            const scrapedImage = await commonUtils.scrapeFirstPosterElement(`.film-poster a[href^="/film/"]`)
+
+            // inject backdrop
+            if (scrapedImage) {
+                commonUtils.injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
+
+                customBackdrops[filmId] = scrapedImage
+                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
+            }
         }
     }
 
@@ -744,7 +774,7 @@
         )
     ) {
         personPageInjector()
-    } else if (/^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?)$/.test(currentURL)) {
+    } else if (/^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?)$/.test(currentURL)) {
         reviewPageInjector()
     }
 })()
