@@ -23,6 +23,63 @@
 ;(() => {
     GM_registerMenuCommand("Settings", showSettingsPopup)
 
+    const defaultConfig = {
+        TMDB_API_KEY: "",
+
+        FILM_SHORT_BACKDROP: false,
+
+        LIST_AUTO_SCRAPE: true,
+        LIST_SHORT_BACKDROP: true,
+
+        USER_AUTO_SCRAPE: true,
+        USER_SHORT_BACKDROP: false,
+        CURRENT_USER_BACKDROP_ONLY: true,
+
+        PERSON_AUTO_SCRAPE: true,
+        PERSON_SHORT_BACKDROP: true,
+
+        REVIEW_AUTO_SCRAPE: false,
+        REVIEW_SHORT_BACKDROP: true,
+    }
+
+    if (GM_getValue("CONFIG", {})?.FILM_SHORT_BACKDROP === undefined) {
+        GM_setValue("CONFIG", defaultConfig)
+    }
+
+    function getConfigData(configId) {
+        const config = GM_getValue("CONFIG", {})
+
+        return config[configId]
+    }
+
+    function setConfigData(configId, value) {
+        const config = GM_getValue("CONFIG", {})
+
+        config[configId] = value
+
+        GM_setValue("CONFIG", config)
+    }
+
+    function getItemData(itemId, dataType) {
+        const itemData = GM_getValue("ITEM_DATA", {})
+
+        return itemData[itemId]?.[dataType] ?? ""
+    }
+
+    function setItemData(itemId, dataType, value) {
+        const itemData = GM_getValue("ITEM_DATA", {})
+
+        const data = itemData[itemId] ?? {}
+        if (value === "") {
+            delete data[dataType]
+        } else {
+            data[dataType] = value
+        }
+        itemData[itemId] = data
+
+        GM_setValue("ITEM_DATA", itemData)
+    }
+
     GM_addStyle(`
         #lcb-settings-overlay {
             position: fixed;
@@ -34,14 +91,14 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
+            z-index: 10000;
         }
         #lcb-settings-popup {
             background-color: #20242c;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 1001;
+            z-index: 10001;
             font-family: Source Sans Pro, Arial, sans-serif;
             font-feature-settings: normal;
             font-variation-settings: normal;
@@ -120,9 +177,7 @@
         }
         `)
 
-    function showImageUrlPopup(itemId) {
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
-
+    async function showImageUrlPopup(itemId) {
         // Create overlay element
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
@@ -142,17 +197,12 @@
         // Create input element
         const input = document.createElement("input")
         input.type = "text"
-        input.value = customBackdrops[itemId] ?? ""
+        input.value = getItemData(itemId, "bUrl")
         input.placeholder = "Backdrop Image URL"
         input.autofocus = true
         input.oninput = (e) => {
-            const value = e.target.value?.trim()
-
-            if (value) {
-                customBackdrops[itemId] = value
-            } else {
-                delete customBackdrops[itemId]
-            }
+            const value = e.target.value?.trim() ?? ""
+            setItemData(itemId, "bUrl", value)
         }
         popup.appendChild(input)
 
@@ -164,7 +214,6 @@
         }, 100)
 
         function closePopup(overlay) {
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
             document.body.removeChild(overlay)
         }
     }
@@ -192,23 +241,23 @@
 
             const input = document.createElement("input")
             input.type = "text"
-            input.value = GM_getValue(id, "")
+            input.value = getConfigData(id)
             input.placeholder = placeholder
             input.oninput = (e) => {
                 const value = e.target.value?.trim()
-                GM_setValue(id, value)
+                setConfigData(id, value)
             }
             popup.appendChild(input)
         }
 
-        function createCheckboxElement(labelText, id, defaultValue = false) {
+        function createCheckboxElement(labelText, id) {
             const container = document.createElement("div")
             container.className = "lcb-checkbox-container"
 
             const checkbox = document.createElement("input")
             checkbox.type = "checkbox"
-            checkbox.checked = GM_getValue(id, defaultValue)
-            checkbox.onchange = (e) => GM_setValue(id, e.target.checked)
+            checkbox.checked = getConfigData(id)
+            checkbox.onchange = (e) => setConfigData(id, e.target.checked)
             container.appendChild(checkbox)
 
             const label = document.createElement("label")
@@ -227,24 +276,8 @@
         // Export settings to a JSON file
         function exportSettings() {
             const settings = {
-                TMDB_API_KEY: GM_getValue("TMDB_API_KEY", ""),
-
-                FILM_SHORT_BACKDROP: GM_getValue("FILM_SHORT_BACKDROP", false),
-
-                LIST_AUTO_SCRAPE: GM_getValue("LIST_AUTO_SCRAPE", true),
-                LIST_SHORT_BACKDROP: GM_getValue("LIST_SHORT_BACKDROP", true),
-
-                USER_AUTO_SCRAPE: GM_getValue("USER_AUTO_SCRAPE", true),
-                USER_SHORT_BACKDROP: GM_getValue("USER_SHORT_BACKDROP", false),
-                CURRENT_USER_BACKDROP_ONLY: GM_getValue("CURRENT_USER_BACKDROP_ONLY", true),
-
-                PERSON_AUTO_SCRAPE: GM_getValue("PERSON_AUTO_SCRAPE", true),
-                PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
-
-                REVIEW_AUTO_SCRAPE: GM_getValue("REVIEW_AUTO_SCRAPE", false),
-                REVIEW_SHORT_BACKDROP: GM_getValue("REVIEW_SHORT_BACKDROP", true),
-
-                CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
+                CONFIG: GM_getValue("CONFIG", {}),
+                ITEM_DATA: GM_getValue("ITEM_DATA", {}),
             }
 
             // Create a data URL for the JSON file
@@ -267,24 +300,9 @@
                 const content = e.target.result
                 try {
                     const settings = JSON.parse(content)
-                    GM_setValue("TMDB_API_KEY", settings.TMDB_API_KEY || "")
 
-                    GM_setValue("FILM_SHORT_BACKDROP", settings.FILM_SHORT_BACKDROP || false)
-
-                    GM_setValue("LIST_AUTO_SCRAPE", settings.LIST_AUTO_SCRAPE || true)
-                    GM_setValue("LIST_SHORT_BACKDROP", settings.LIST_SHORT_BACKDROP || true)
-
-                    GM_setValue("USER_AUTO_SCRAPE", settings.USER_AUTO_SCRAPE || true)
-                    GM_setValue("USER_SHORT_BACKDROP", settings.USER_SHORT_BACKDROP || false)
-                    GM_setValue("CURRENT_USER_BACKDROP_ONLY", settings.CURRENT_USER_BACKDROP_ONLY || true)
-
-                    GM_setValue("PERSON_AUTO_SCRAPE", settings.PERSON_AUTO_SCRAPE || true)
-                    GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
-
-                    GM_setValue("REVIEW_AUTO_SCRAPE", settings.REVIEW_AUTO_SCRAPE || false)
-                    GM_setValue("REVIEW_SHORT_BACKDROP", settings.REVIEW_SHORT_BACKDROP || true)
-
-                    GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
+                    GM_setValue("CONFIG", settings.CONFIG || {})
+                    GM_setValue("ITEM_DATA", settings.ITEM_DATA || {})
 
                     // Refresh the popup to reflect imported settings
                     closePopup(overlay)
@@ -298,29 +316,29 @@
 
         // Add checkbox fields
         createLabelElement("Film Page:")
-        createCheckboxElement("Short backdrops", "FILM_SHORT_BACKDROP", false)
+        createCheckboxElement("Short backdrops", "FILM_SHORT_BACKDROP")
         createInputElement("Enter your TMDB API key to display missing film backdrops (optional):", "TMDB_API_KEY", "TMDB API Key")
         createSpaceComponent()
 
         createLabelElement("List Page:")
-        createCheckboxElement("Auto scrape backdrops", "LIST_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops", "LIST_SHORT_BACKDROP", true)
+        createCheckboxElement("Auto scrape backdrops", "LIST_AUTO_SCRAPE")
+        createCheckboxElement("Short backdrops", "LIST_SHORT_BACKDROP")
         createSpaceComponent()
 
         createLabelElement("User Page:")
-        createCheckboxElement("Auto scrape backdrops", "USER_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops", "USER_SHORT_BACKDROP", false)
-        createCheckboxElement("Don't scrape backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY", true)
+        createCheckboxElement("Auto scrape backdrops", "USER_AUTO_SCRAPE")
+        createCheckboxElement("Short backdrops", "USER_SHORT_BACKDROP")
+        createCheckboxElement("Don't scrape backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY")
         createSpaceComponent()
 
         createLabelElement("Person Page:")
-        createCheckboxElement("Auto scrape backdrops", "PERSON_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops", "PERSON_SHORT_BACKDROP", true)
+        createCheckboxElement("Auto scrape backdrops", "PERSON_AUTO_SCRAPE")
+        createCheckboxElement("Short backdrops", "PERSON_SHORT_BACKDROP")
         createSpaceComponent()
 
         createLabelElement("Review Page:")
-        createCheckboxElement("Auto scrape backdrops", "REVIEW_AUTO_SCRAPE", false)
-        createCheckboxElement("Short backdrops", "REVIEW_SHORT_BACKDROP", true)
+        createCheckboxElement("Auto scrape backdrops", "REVIEW_AUTO_SCRAPE")
+        createCheckboxElement("Short backdrops", "REVIEW_SHORT_BACKDROP")
         createSpaceComponent()
 
         // Import/Export Buttons
@@ -394,9 +412,9 @@
         }
 
         async function getTmdbBackdrop(tmdbIdType, tmdbId) {
-            if (!GM_getValue("TMDB_API_KEY", "")) return null
+            if (!getConfigData("TMDB_API_KEY")) return null
 
-            const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${GM_getValue("TMDB_API_KEY", "")}`)
+            const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`)
             const tmdbRes = await tmdbRawRes.json()
 
             const imageId = tmdbRes.backdrops?.[0]?.file_path
@@ -448,10 +466,10 @@
             const firstPosterElement = await waitForElement(selector, 2000)
             const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
 
-            const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+            const cacheBackdrop = getItemData(`f/${filmName}`, "bUrl")
 
-            if (customBackdrops[`f/${filmName}`]) {
-                return [customBackdrops[`f/${filmName}`], true]
+            if (cacheBackdrop) {
+                return [cacheBackdrop, true]
             } else if (!shouldScrape) {
                 return null
             }
@@ -523,33 +541,28 @@
     async function filmPageInjector() {
         const filmId = `f/${location.pathname.split("/")?.[2]}`
 
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
-
         const header = await commonUtils.waitForElement("#header")
         filmPageContextMenuInjector(filmId)
 
-        if (customBackdrops[filmId]) {
+        const cacheBackdrop = getItemData(filmId, "bUrl")
+
+        if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(
-                header,
-                customBackdrops[filmId],
-                GM_getValue("FILM_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : []
-            )
+            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
         // if original backdrop is available then return
         if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        if (GM_getValue("TMDB_API_KEY", "")) {
+        if (getConfigData("TMDB_API_KEY")) {
             const backdropUrl = await commonUtils.extractBackdropUrlFromLetterboxdFilmPage()
 
             // inject backdrop
             if (backdropUrl) {
-                commonUtils.injectBackdrop(header, backdropUrl, GM_getValue("FILM_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : [])
+                commonUtils.injectBackdrop(header, backdropUrl, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
-                customBackdrops[filmId] = backdropUrl
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
+                setItemData(filmId, "bUrl", backdropUrl)
             }
         }
     }
@@ -594,20 +607,16 @@
             ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
             ?.split("=")[1]
 
-        if (GM_getValue("CURRENT_USER_BACKDROP_ONLY", true) && location.pathname.split("/")?.[1] !== loggedInAs) return
+        if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && location.pathname.split("/")?.[1] !== loggedInAs) return
 
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+        const cacheBackdrop = getItemData(userId, "bUrl")
 
         const header = await commonUtils.waitForElement("#header")
         profilePageContextMenuInjector(userId)
 
-        if (customBackdrops[userId]) {
+        if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(
-                header,
-                customBackdrops[userId],
-                GM_getValue("USER_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : []
-            )
+            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
@@ -616,17 +625,16 @@
 
         const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(
             "#favourites .poster-list > li:first-child a",
-            GM_getValue("USER_AUTO_SCRAPE", true)
+            getConfigData("USER_AUTO_SCRAPE")
         )
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(header, scrapedImage, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
             if (isCached) return
 
-            customBackdrops[userId] = scrapedImage
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
+            setItemData(userId, "bUrl", scrapedImage)
         }
     }
 
@@ -647,36 +655,32 @@
     async function listPageInjector() {
         const listId = `l/${location.pathname.split("/")?.[1]}/${location.pathname.split("/")?.[3]}`
 
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+        const cacheBackdrop = getItemData(listId, "bUrl")
 
         const header = await commonUtils.waitForElement("#header")
         listPageContextMenuInjector(listId)
 
         // remove short backdrop classnames for non custom backrop list pages
-        if (!GM_getValue("LIST_SHORT_BACKDROP", true)) document.body.classList.remove("shortbackdropped", "-crop")
+        if (!getConfigData("LIST_SHORT_BACKDROP")) document.body.classList.remove("shortbackdropped", "-crop")
 
-        if (customBackdrops[listId]) {
+        if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[listId], GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
         // if original backdrop is available then return
         if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(
-            ".poster-list > li:first-child a",
-            GM_getValue("LIST_AUTO_SCRAPE", true)
-        )
+        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(".poster-list > li:first-child a", getConfigData("LIST_AUTO_SCRAPE"))
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(header, scrapedImage, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
             if (isCached) return
 
-            customBackdrops[listId] = scrapedImage
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
+            setItemData(listId, "bUrl", scrapedImage)
         }
     }
 
@@ -712,34 +716,29 @@
     async function personPageInjector() {
         const personId = `p/${location.pathname.split("/")?.[2]}`
 
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+        const cacheBackdrop = getItemData(personId, "bUrl")
 
         const header = await commonUtils.waitForElement("#header")
         personPageContextMenuInjector(personId)
 
-        if (customBackdrops[personId]) {
+        if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(
-                header,
-                customBackdrops[personId],
-                GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : []
-            )
+            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
         // if original backdrop is available then return
         if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(".grid > li:first-child a", GM_getValue("PERSON_AUTO_SCRAPE", true))
+        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(".grid > li:first-child a", getConfigData("PERSON_AUTO_SCRAPE"))
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+            commonUtils.injectBackdrop(header, scrapedImage, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
             if (isCached) return
 
-            customBackdrops[personId] = scrapedImage
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
+            setItemData(personId, "bUrl", scrapedImage)
         }
     }
 
@@ -747,18 +746,14 @@
         const filmName = location.pathname.match(/\/film\/([^\/]+)/)?.[1]
         const filmId = `f/${filmName}`
 
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+        const cacheBackdrop = getItemData(filmId, "bUrl")
 
         const header = await commonUtils.waitForElement("#header")
         filmPageContextMenuInjector(filmId)
 
-        if (customBackdrops[filmId]) {
+        if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(
-                header,
-                customBackdrops[filmId],
-                GM_getValue("REVIEW_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : []
-            )
+            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("REVIEW_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
@@ -767,7 +762,7 @@
 
         const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(
             `.film-poster a[href^="/film/"]`,
-            GM_getValue("REVIEW_AUTO_SCRAPE", false)
+            getConfigData("REVIEW_AUTO_SCRAPE")
         )
 
         // inject backdrop
@@ -776,8 +771,7 @@
 
             if (isCached) return
 
-            customBackdrops[filmId] = scrapedImage
-            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
+            setItemData(filmId, "bUrl", scrapedImage)
         }
     }
 
