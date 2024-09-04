@@ -407,9 +407,12 @@
         async function isDefaultBackdropAvailable(dom) {
             let defaultBackdropElement
             if (dom) {
-                defaultBackdropElement = dom.querySelector(`#backdrop`)
+                defaultBackdropElement = dom.querySelector("#backdrop")
             } else {
-                defaultBackdropElement = await waitForElement(`#backdrop`, 5000)
+                defaultBackdropElement = document.querySelector("#backdrop")
+                if (!defaultBackdropElement) {
+                    defaultBackdropElement = await waitForElement("#backdrop", 100)
+                }
             }
             const defaultBackdropUrl =
                 defaultBackdropElement?.dataset?.backdrop2x ||
@@ -429,7 +432,7 @@
                 if (dom) {
                     tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
                 } else {
-                    tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 10000)
+                    tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
                 }
                 const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
                 const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
@@ -442,7 +445,7 @@
         }
 
         async function scrapeFilmLinkElement(selector, shouldScrape) {
-            const firstPosterElement = await waitForElement(selector, 10000)
+            const firstPosterElement = await waitForElement(selector, 2000)
             const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
 
             const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
@@ -504,7 +507,7 @@
     })()
 
     async function filmPageContextMenuInjector(filmId) {
-        const panelRateElement = await commonUtils.waitForElement("li.panel-rate")
+        const panelRateElement = await commonUtils.waitForElement("li.panel-rate", 2000)
 
         const setFilmBackdropMenu = document.createElement("li")
 
@@ -552,7 +555,7 @@
     }
 
     async function profilePageContextMenuInjector(userId) {
-        const copyLinkMenu = await commonUtils.waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`)
+        const copyLinkMenu = await commonUtils.waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 2000)
 
         const setProfileBackdropMenu = document.createElement("div")
         setProfileBackdropMenu.classList.add("menuitem", "-trigger", "-has-icon", "js-menuitem")
@@ -628,7 +631,7 @@
     }
 
     async function listPageContextMenuInjector(listId) {
-        const panelRateElement = await commonUtils.waitForElement("li.like-link-target")
+        const panelRateElement = await commonUtils.waitForElement("li.like-link-target", 2000)
 
         const setListBackdropMenu = document.createElement("li")
 
@@ -678,7 +681,7 @@
     }
 
     async function personPageContextMenuInjector(personId) {
-        const personImageElement = await commonUtils.waitForElement(".person-image")
+        const personImageElement = await commonUtils.waitForElement(".person-image", 2000)
 
         // Create the button element
         const setPersonBackdropButton = document.createElement("button")
