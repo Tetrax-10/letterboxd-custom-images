@@ -242,6 +242,7 @@
                 PERSON_SHORT_BACKDROP: GM_getValue("PERSON_SHORT_BACKDROP", true),
 
                 REVIEW_AUTO_SCRAPE: GM_getValue("REVIEW_AUTO_SCRAPE", false),
+                REVIEW_SHORT_BACKDROP: GM_getValue("REVIEW_SHORT_BACKDROP", true),
 
                 CUSTOM_BACKDROPS: GM_getValue("CUSTOM_BACKDROPS", {}),
             }
@@ -281,6 +282,7 @@
                     GM_setValue("PERSON_SHORT_BACKDROP", settings.PERSON_SHORT_BACKDROP || true)
 
                     GM_setValue("REVIEW_AUTO_SCRAPE", settings.REVIEW_AUTO_SCRAPE || false)
+                    GM_setValue("REVIEW_SHORT_BACKDROP", settings.REVIEW_SHORT_BACKDROP || true)
 
                     GM_setValue("CUSTOM_BACKDROPS", settings.CUSTOM_BACKDROPS || {})
 
@@ -296,28 +298,29 @@
 
         // Add checkbox fields
         createLabelElement("Film Page:")
-        createCheckboxElement("Short backdrops for film pages", "FILM_SHORT_BACKDROP", false)
-        createInputElement("Enter your TMDB API key to display missing backdrops (optional):", "TMDB_API_KEY", "TMDB API Key")
+        createCheckboxElement("Short backdrops", "FILM_SHORT_BACKDROP", false)
+        createInputElement("Enter your TMDB API key to display missing film backdrops (optional):", "TMDB_API_KEY", "TMDB API Key")
         createSpaceComponent()
 
         createLabelElement("List Page:")
-        createCheckboxElement("Auto scrape backdrops if unavailable for list pages", "LIST_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops for list pages", "LIST_SHORT_BACKDROP", true)
+        createCheckboxElement("Auto scrape backdrops", "LIST_AUTO_SCRAPE", true)
+        createCheckboxElement("Short backdrops", "LIST_SHORT_BACKDROP", true)
         createSpaceComponent()
 
         createLabelElement("User Page:")
-        createCheckboxElement("Auto scrape backdrops if unavailable for user pages", "USER_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops for user pages", "USER_SHORT_BACKDROP", false)
-        createCheckboxElement("Don't show user backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY", true)
+        createCheckboxElement("Auto scrape backdrops", "USER_AUTO_SCRAPE", true)
+        createCheckboxElement("Short backdrops", "USER_SHORT_BACKDROP", false)
+        createCheckboxElement("Don't scrape backdrops for other free tier users", "CURRENT_USER_BACKDROP_ONLY", true)
         createSpaceComponent()
 
         createLabelElement("Person Page:")
-        createCheckboxElement("Auto scrape backdrops if unavailable for person pages", "PERSON_AUTO_SCRAPE", true)
-        createCheckboxElement("Short backdrops for person pages", "PERSON_SHORT_BACKDROP", true)
+        createCheckboxElement("Auto scrape backdrops", "PERSON_AUTO_SCRAPE", true)
+        createCheckboxElement("Short backdrops", "PERSON_SHORT_BACKDROP", true)
         createSpaceComponent()
 
         createLabelElement("Review Page:")
-        createCheckboxElement("Auto scrape backdrops if unavailable for review pages", "REVIEW_AUTO_SCRAPE", false)
+        createCheckboxElement("Auto scrape backdrops", "REVIEW_AUTO_SCRAPE", false)
+        createCheckboxElement("Short backdrops", "REVIEW_SHORT_BACKDROP", true)
         createSpaceComponent()
 
         // Import/Export Buttons
@@ -401,8 +404,13 @@
             return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
         }
 
-        function isDefaultBackdropAvailable(dom = document) {
-            const defaultBackdropElement = dom.querySelector("#backdrop")
+        async function isDefaultBackdropAvailable(dom) {
+            let defaultBackdropElement
+            if (dom) {
+                defaultBackdropElement = dom.querySelector(`#backdrop`)
+            } else {
+                defaultBackdropElement = await waitForElement(`#backdrop`, 5000)
+            }
             const defaultBackdropUrl =
                 defaultBackdropElement?.dataset?.backdrop2x ||
                 defaultBackdropElement?.dataset?.backdrop ||
@@ -413,11 +421,16 @@
         }
 
         async function extractBackdropUrlFromLetterboxdFilmPage(dom) {
-            const filmBackdropUrl = isDefaultBackdropAvailable(dom)
+            const filmBackdropUrl = await isDefaultBackdropAvailable(dom)
 
             if (!filmBackdropUrl) {
                 // get tmdb id
-                const tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
+                let tmdbElement
+                if (dom) {
+                    tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
+                } else {
+                    tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 10000)
+                }
                 const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
                 const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
@@ -428,25 +441,27 @@
             return filmBackdropUrl
         }
 
-        async function scrapeFirstPosterElement(selector) {
+        async function scrapeFilmLinkElement(selector, shouldScrape) {
             const firstPosterElement = await waitForElement(selector, 10000)
             const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
 
             const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
 
             if (customBackdrops[`f/${filmName}`]) {
-                return customBackdrops[`f/${filmName}`]
+                return [customBackdrops[`f/${filmName}`], true]
+            } else if (!shouldScrape) {
+                return null
             }
 
             return new Promise((resolve) => {
                 GM_xmlhttpRequest({
                     method: "GET",
                     url: `https://letterboxd.com/film/${filmName}/`,
-                    onload: function (response) {
+                    onload: async function (response) {
                         const parser = new DOMParser()
                         const dom = parser.parseFromString(response.responseText, "text/html")
 
-                        resolve(extractBackdropUrlFromLetterboxdFilmPage(dom))
+                        resolve([await extractBackdropUrlFromLetterboxdFilmPage(dom), false])
                     },
                     onerror: function (error) {
                         console.error(`Can't scrape Letterboxd page: ${firstPosterElement.href}`, error)
@@ -482,7 +497,7 @@
             waitForElement: waitForElement,
             getTmdbBackdrop: getTmdbBackdrop,
             extractBackdropUrlFromLetterboxdFilmPage: extractBackdropUrlFromLetterboxdFilmPage,
-            scrapeFirstPosterElement: scrapeFirstPosterElement,
+            scrapeFilmLinkElement: scrapeFilmLinkElement,
             isDefaultBackdropAvailable: isDefaultBackdropAvailable,
             injectBackdrop: injectBackdrop,
         }
@@ -521,10 +536,10 @@
         }
 
         // if original backdrop is available then return
-        if (commonUtils.isDefaultBackdropAvailable()) return
+        if (await commonUtils.isDefaultBackdropAvailable()) return
 
         if (GM_getValue("TMDB_API_KEY", "")) {
-            const backdropUrl = await commonUtils.extractBackdropUrlFromLetterboxdFilmPage(document)
+            const backdropUrl = await commonUtils.extractBackdropUrlFromLetterboxdFilmPage()
 
             // inject backdrop
             if (backdropUrl) {
@@ -594,18 +609,21 @@
         }
 
         // if original backdrop is available then return
-        if (commonUtils.isDefaultBackdropAvailable()) return
+        if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        if (GM_getValue("USER_AUTO_SCRAPE", true)) {
-            const scrapedImage = await commonUtils.scrapeFirstPosterElement("#favourites .poster-list > li:first-child a")
+        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(
+            "#favourites .poster-list > li:first-child a",
+            GM_getValue("USER_AUTO_SCRAPE", true)
+        )
 
-            // inject backdrop
-            if (scrapedImage) {
-                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : [])
+        // inject backdrop
+        if (scrapedImage) {
+            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("USER_SHORT_BACKDROP", false) ? ["shortbackdropped", "-crop"] : [])
 
-                customBackdrops[userId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
-            }
+            if (isCached) return
+
+            customBackdrops[userId] = scrapedImage
+            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
         }
     }
 
@@ -641,18 +659,21 @@
         }
 
         // if original backdrop is available then return
-        if (commonUtils.isDefaultBackdropAvailable()) return
+        if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        if (GM_getValue("LIST_AUTO_SCRAPE", true)) {
-            const scrapedImage = await commonUtils.scrapeFirstPosterElement(".poster-list > li:first-child a")
+        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(
+            ".poster-list > li:first-child a",
+            GM_getValue("LIST_AUTO_SCRAPE", true)
+        )
 
-            // inject backdrop
-            if (scrapedImage) {
-                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+        // inject backdrop
+        if (scrapedImage) {
+            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("LIST_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
 
-                customBackdrops[listId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
-            }
+            if (isCached) return
+
+            customBackdrops[listId] = scrapedImage
+            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
         }
     }
 
@@ -704,48 +725,56 @@
         }
 
         // if original backdrop is available then return
-        if (commonUtils.isDefaultBackdropAvailable()) return
+        if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        if (GM_getValue("PERSON_AUTO_SCRAPE", true)) {
-            const scrapedImage = await commonUtils.scrapeFirstPosterElement(".grid > li:first-child a")
+        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(".grid > li:first-child a", GM_getValue("PERSON_AUTO_SCRAPE", true))
 
-            // inject backdrop
-            if (scrapedImage) {
-                commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
+        // inject backdrop
+        if (scrapedImage) {
+            commonUtils.injectBackdrop(header, scrapedImage, GM_getValue("PERSON_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : [])
 
-                customBackdrops[personId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
-            }
+            if (isCached) return
+
+            customBackdrops[personId] = scrapedImage
+            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
         }
     }
 
     async function reviewPageInjector() {
-        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
-
-        const header = await commonUtils.waitForElement("#header")
-
         const filmName = location.pathname.match(/\/film\/([^\/]+)/)?.[1]
         const filmId = `f/${filmName}`
 
+        const customBackdrops = GM_getValue("CUSTOM_BACKDROPS", {})
+
+        const header = await commonUtils.waitForElement("#header")
+        filmPageContextMenuInjector(filmId)
+
         if (customBackdrops[filmId]) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, customBackdrops[filmId], ["shortbackdropped", "-crop"])
+            commonUtils.injectBackdrop(
+                header,
+                customBackdrops[filmId],
+                GM_getValue("REVIEW_SHORT_BACKDROP", true) ? ["shortbackdropped", "-crop"] : []
+            )
             return
         }
 
         // if original backdrop is available then return
-        if (commonUtils.isDefaultBackdropAvailable()) return
+        if (await commonUtils.isDefaultBackdropAvailable()) return
 
-        if (GM_getValue("REVIEW_AUTO_SCRAPE", false)) {
-            const scrapedImage = await commonUtils.scrapeFirstPosterElement(`.film-poster a[href^="/film/"]`)
+        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(
+            `.film-poster a[href^="/film/"]`,
+            GM_getValue("REVIEW_AUTO_SCRAPE", false)
+        )
 
-            // inject backdrop
-            if (scrapedImage) {
-                commonUtils.injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
+        // inject backdrop
+        if (scrapedImage) {
+            commonUtils.injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
 
-                customBackdrops[filmId] = scrapedImage
-                GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
-            }
+            if (isCached) return
+
+            customBackdrops[filmId] = scrapedImage
+            GM_setValue("CUSTOM_BACKDROPS", customBackdrops || {})
         }
     }
 

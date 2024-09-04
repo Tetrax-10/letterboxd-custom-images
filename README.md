@@ -12,37 +12,53 @@ All the customization this script provides is local and won't be visible to othe
 
 <br>
 
-### Custom Profile Backdrop
+### Customize Profile Backdrops
 
-<img alt="Before" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/profile_before.jpg" style="width: 800px;">
+![profile_before.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/profile_before.jpg)
 
-<img alt="After" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/profile_after.jpg" style="width: 800px;">
+![profile_after.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/profile_after.jpg)
 
-### Custom Film Backdrop
+<br>
 
-<img alt="Before" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/custom_film_before.jpg" style="width: 800px;">
+### Customize Film Backdrops
 
-<img alt="After" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/custom_film_after.jpg" style="width: 800px;">
+![custom_film_before.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/custom_film_before.jpg)
 
-### Custom List Backdrop
+![custom_film_after.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/custom_film_after.jpg)
 
-<img alt="Before" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/list_before.jpg" style="width: 800px;">
+<br>
 
-<img alt="After" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/list_after.jpg" style="width: 800px;">
-
-### Automatically display Backdrops for less popular films
+### Automatically display backdrops for less popular films
 
 Letterboxd doesn't display backdrops for less popular films. So this script uses your TMDB Api to fetch backdrop automatically for those films and display them.
 
-<img alt="Before" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/film_before.jpg" style="width: 800px;">
+![film_before.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/film_before.jpg)
 
-<img alt="After" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/film_after.jpg" style="width: 800px;">
+![film_after.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/film_after.jpg)
 
-### How to open script settings?
+<br>
 
-To open script settings, click on the tampermonkey icon in your browser and click the gear icon. The gear icon will only appear if you are in a [letterboxd page](https://letterboxd.com/).
+### Customize List Backdrops
 
-<img alt="open script settings" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/script_settings.jpg" style="width: 250px;">
+![list_before.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/list_before.jpg)
+
+![list_after.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/list_after.jpg)
+
+<br>
+
+### Customize Review Backdrops
+
+![review_before.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/review_before.jpg)
+
+![review_after.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/review_after.jpg)
+
+<br>
+
+### How to open settings?
+
+To open settings, click on the tampermonkey icon in your browser and click the gear icon. The gear icon will only appear if you are in a [letterboxd page](https://letterboxd.com/).
+
+<img alt="open settings" src="https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/script_settings.jpg" style="width: 250px;">
 
 ### Screenshots of settings menu
 
