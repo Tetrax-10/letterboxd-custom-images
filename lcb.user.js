@@ -323,14 +323,14 @@
         if (targetedFilmId && getItemData(targetedFilmId, "tId")) {
             filmId = targetedFilmId
         } else if (targetedFilmId && !getItemData(targetedFilmId, "tId")) {
-            await scrapeFilmPage(targetedFilmId.split("/")?.[1])
+            await scrapeFilmPage(targetedFilmId.slice(2))
             filmId = targetedFilmId
         }
         // "Set film backdrop" contextmenu (film and review pages)
         else if (itemId.startsWith("f/") && getItemData(itemId, "tId")) {
             filmId = itemId
         } else if (itemId.startsWith("f/") && !getItemData(itemId, "tId")) {
-            await scrapeFilmPage(itemId.split("/")?.[1])
+            await scrapeFilmPage(itemId.slice(2))
             filmId = itemId
         }
 
@@ -703,6 +703,11 @@
         // inject necessary classes
         document.body.classList.add("backdropped", "backdrop-loaded", ...attributes)
         document.getElementById("content")?.classList.add("-backdrop")
+
+        // make sure to inject .-backdrop to #content if its missed before
+        setTimeout(() => {
+            document.getElementById("content")?.classList.add("-backdrop")
+        }, 500)
 
         // inject backdrop child
         backdropContainer.innerHTML = `
