@@ -1,8 +1,8 @@
 # Letterboxd Custom Backdrops
 
-Allows you to customize letterboxd backdrops of your profile, film, list, review and person pages "without letterboxd PATRON". Additionally, it shows backdrops for less popular films.
+This userscript allows you to customize _letterboxd backdrops_ without letterboxd _PATRON_.
 
-All the customization this script provides is local and won't be visible to other users.
+All the customization this userscript provides is local and won't be visible to other users.
 
 ## Installation
 
@@ -63,3 +63,9 @@ To open settings, click on the tampermonkey icon in your browser and click the g
 ### Screenshots of settings menu
 
 ![settings menu](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/settings_menu.jpg)
+
+### Screenshots of backdrop chooser
+
+**_Note:_** **The backdrop preview will only appear if you have entered your TMDB API key.** Without that, you can only enter backdrop url manually in the text box.
+
+![backdrop chooser](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-backdrops/main/screenshots/backdrop_chooser.jpg)
