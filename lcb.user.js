@@ -23,6 +23,11 @@
 ;(() => {
     GM_registerMenuCommand("Settings", showSettingsPopup)
 
+    const loggedInAs = document.cookie
+        ?.split("; ")
+        ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
+        ?.split("=")[1]
+
     const defaultConfig = {
         TMDB_API_KEY: "",
 
@@ -665,7 +670,7 @@
                     resolve([await extractBackdropUrlFromLetterboxdFilmPage(`f/${filmName}`, dom), false])
                 },
                 onerror: function (error) {
-                    console.error(`Can't scrape Letterboxd page: ${firstPosterElement.href}`, error)
+                    console.error(`Can't scrape Letterboxd page: ${filmName}`, error)
                     resolve([null, false])
                 },
             })
@@ -827,11 +832,6 @@
         const userId = `u/${location.pathname.split("/")?.[1]}`
 
         const filmElementSelector = "#favourites .poster-list > li:first-child a"
-
-        const loggedInAs = document.cookie
-            ?.split("; ")
-            ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
-            ?.split("=")[1]
 
         if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && location.pathname.split("/")?.[1] !== loggedInAs) return
 
@@ -998,6 +998,6 @@
     } else if (reviewPageRegex.test(currentURL)) {
         reviewPageInjector()
     } else {
-        injectContextMenuToAllFilmPosterItems()
+        injectContextMenuToAllFilmPosterItems({ itemId: `u/${loggedInAs}`, name: "user" })
     }
 })()
