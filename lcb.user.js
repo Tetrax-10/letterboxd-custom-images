@@ -229,24 +229,20 @@
         `)
 
     async function showImageUrlPopup({ itemId, targetedFilmId } = {}) {
-        // Create overlay element
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
         overlay.onclick = (e) => {
             if (e.target === overlay) closePopup(overlay)
         }
 
-        // Popup element
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
         popup.setAttribute("type", "burlpopup")
 
-        // Create label element
         const label = document.createElement("label")
         label.textContent = "Enter Backdrop Image URL:"
         popup.appendChild(label)
 
-        // Create input element
         const input = document.createElement("input")
         input.type = "text"
         input.value = getItemData(itemId, "bUrl")
@@ -271,7 +267,6 @@
 
         if (!getConfigData("TMDB_API_KEY")) return
 
-        // Add spinner element
         const spinner = document.createElement("div")
         spinner.id = "lcb-loading-spinner"
         popup.appendChild(spinner)
@@ -282,14 +277,14 @@
         if (targetedFilmId && getItemData(targetedFilmId, "tmdbId")) {
             filmId = targetedFilmId
         } else if (targetedFilmId && !getItemData(targetedFilmId, "tmdbId")) {
-            await commonUtils.scrapeFilmPage(targetedFilmId.split("/")?.[1])
+            await scrapeFilmPage(targetedFilmId.split("/")?.[1])
             filmId = targetedFilmId
         }
         // "Set film backdrop" contextmenu (film and review pages)
         else if (itemId.startsWith("f/") && getItemData(itemId, "tmdbId")) {
             filmId = itemId
         } else if (itemId.startsWith("f/") && !getItemData(itemId, "tmdbId")) {
-            await commonUtils.scrapeFilmPage(itemId.split("/")?.[1])
+            await scrapeFilmPage(itemId.split("/")?.[1])
             filmId = itemId
         }
 
@@ -304,7 +299,7 @@
 
         const loadMoreButton = document.createElement("button")
         loadMoreButton.id = "lcb-load-more"
-        loadMoreButton.textContent = "Load More"
+        loadMoreButton.textContent = "Load more"
         loadMoreButton.onclick = () => loadMoreImages()
         popup.appendChild(loadMoreButton)
 
@@ -361,14 +356,12 @@
     }
 
     function showSettingsPopup() {
-        // Create overlay element
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
         overlay.onclick = (e) => {
             if (e.target === overlay) closePopup(overlay)
         }
 
-        // Popup element
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
 
@@ -432,7 +425,6 @@
             document.body.removeChild(downloadAnchor)
         }
 
-        // Import settings from a JSON file
         function importSettings(event) {
             const file = event.target.files[0]
             if (!file) return
@@ -450,13 +442,13 @@
                     closePopup(overlay)
                     showSettingsPopup()
                 } catch (err) {
+                    console.error(err)
                     alert("Failed to import settings: Invalid JSON file.")
                 }
             }
             reader.readAsText(file)
         }
 
-        // Add checkbox fields
         createInputElement(
             "Enter your TMDB API key to display missing film backdrops and get ability to select backdrops from UI:",
             "TMDB_API_KEY",
@@ -520,175 +512,163 @@
         }
     }
 
-    const commonUtils = (() => {
-        async function waitForElement(selector, timeout = null, nthElement = 1) {
-            // wait till document body loads
-            while (!document.body) {
-                await new Promise((resolve) => setTimeout(resolve, 10))
+    async function waitForElement(selector, timeout = null, nthElement = 1) {
+        // wait till document body loads
+        while (!document.body) {
+            await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+
+        nthElement -= 1
+
+        return new Promise((resolve) => {
+            if (document.querySelectorAll(selector)?.[nthElement]) {
+                return resolve(document.querySelectorAll(selector)?.[nthElement])
             }
 
-            nthElement -= 1
-
-            return new Promise((resolve) => {
+            const observer = new MutationObserver(async () => {
                 if (document.querySelectorAll(selector)?.[nthElement]) {
-                    return resolve(document.querySelectorAll(selector)?.[nthElement])
-                }
-
-                const observer = new MutationObserver(async () => {
-                    if (document.querySelectorAll(selector)?.[nthElement]) {
-                        resolve(document.querySelectorAll(selector)?.[nthElement])
-                        observer.disconnect()
-                    } else {
-                        if (timeout) {
-                            async function timeOver() {
-                                return new Promise((resolve) => {
-                                    setTimeout(() => {
-                                        observer.disconnect()
-                                        resolve(false)
-                                    }, timeout)
-                                })
-                            }
-                            resolve(await timeOver())
+                    resolve(document.querySelectorAll(selector)?.[nthElement])
+                    observer.disconnect()
+                } else {
+                    if (timeout) {
+                        async function timeOver() {
+                            return new Promise((resolve) => {
+                                setTimeout(() => {
+                                    observer.disconnect()
+                                    resolve(false)
+                                }, timeout)
+                            })
                         }
+                        resolve(await timeOver())
                     }
-                })
-
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true,
-                })
-            })
-        }
-
-        async function getTmdbBackdrop(tmdbIdType, tmdbId) {
-            if (!getConfigData("TMDB_API_KEY")) return null
-
-            const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`)
-            const tmdbRes = await tmdbRawRes.json()
-
-            const imageId = tmdbRes.backdrops?.[0]?.file_path
-
-            return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
-        }
-
-        async function isDefaultBackdropAvailable(dom) {
-            let defaultBackdropElement
-            if (dom) {
-                defaultBackdropElement = dom.querySelector("#backdrop")
-            } else {
-                defaultBackdropElement = document.querySelector("#backdrop")
-                if (!defaultBackdropElement) {
-                    defaultBackdropElement = await waitForElement("#backdrop", 100)
                 }
-            }
-            const defaultBackdropUrl =
-                defaultBackdropElement?.dataset?.backdrop2x ||
-                defaultBackdropElement?.dataset?.backdrop ||
-                defaultBackdropElement?.dataset?.backdropMobile
-
-            if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) return defaultBackdropUrl
-            return false
-        }
-
-        async function extractBackdropUrlFromLetterboxdFilmPage(filmId, dom) {
-            const filmBackdropUrl = await isDefaultBackdropAvailable(dom)
-
-            // get tmdb id
-            let tmdbElement
-            if (dom) {
-                tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
-            } else {
-                tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
-            }
-            const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
-            const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
-
-            if (tmdbIdType && tmdbId) {
-                setItemData(filmId, "type", tmdbIdType)
-                setItemData(filmId, "tmdbId", tmdbId)
-            }
-
-            if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`)) {
-                // get tmdb backdrop
-                return await getTmdbBackdrop(tmdbIdType, tmdbId)
-            }
-
-            return filmBackdropUrl
-        }
-
-        function scrapeFilmPage(filmName) {
-            return new Promise((resolve) => {
-                GM_xmlhttpRequest({
-                    method: "GET",
-                    url: `https://letterboxd.com/film/${filmName}/`,
-                    onload: async function (response) {
-                        const parser = new DOMParser()
-                        const dom = parser.parseFromString(response.responseText, "text/html")
-
-                        resolve([await extractBackdropUrlFromLetterboxdFilmPage(`f/${filmName}`, dom), false])
-                    },
-                    onerror: function (error) {
-                        console.error(`Can't scrape Letterboxd page: ${firstPosterElement.href}`, error)
-                        resolve([null, false])
-                    },
-                })
             })
-        }
 
-        async function scrapeFilmLinkElement(selector, shouldScrape, itemId) {
-            const firstPosterElement = await waitForElement(selector, 2000)
-            if (!firstPosterElement) return [null, false]
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            })
+        })
+    }
 
-            const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
-            const filmId = `f/${filmName}`
+    async function getTmdbBackdrop(tmdbIdType, tmdbId) {
+        if (!getConfigData("TMDB_API_KEY")) return null
 
-            if (!itemId.startsWith("f/")) setItemData(itemId, "fId", filmId)
+        const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`)
+        const tmdbRes = await tmdbRawRes.json()
 
-            const cacheBackdrop = getItemData(filmId, "bUrl")
+        const imageId = tmdbRes.backdrops?.[0]?.file_path
 
-            if (cacheBackdrop) {
-                return [cacheBackdrop, true]
-            } else if (!shouldScrape) {
-                return [null, false]
-            } else {
-                return await scrapeFilmPage(filmName)
+        return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
+    }
+
+    async function isDefaultBackdropAvailable(dom) {
+        let defaultBackdropElement
+        if (dom) {
+            defaultBackdropElement = dom.querySelector("#backdrop")
+        } else {
+            defaultBackdropElement = document.querySelector("#backdrop")
+            if (!defaultBackdropElement) {
+                defaultBackdropElement = await waitForElement("#backdrop", 100)
             }
         }
+        const defaultBackdropUrl =
+            defaultBackdropElement?.dataset?.backdrop2x ||
+            defaultBackdropElement?.dataset?.backdrop ||
+            defaultBackdropElement?.dataset?.backdropMobile
 
-        function injectBackdrop(header, backdropUrl, attributes = []) {
-            // get or inject backdrop containers
-            const backdropContainer =
-                // for patron users who already have an backdrop
-                document.querySelector(".backdrop-container") ||
-                // for non-patron users
-                Object.assign(document.createElement("div"), { className: "backdrop-container" })
+        if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) return defaultBackdropUrl
+        return false
+    }
 
-            // inject necessary classes
-            document.body.classList.add("backdropped", "backdrop-loaded", ...attributes)
-            document.getElementById("content")?.classList.add("-backdrop")
+    async function extractBackdropUrlFromLetterboxdFilmPage(filmId, dom) {
+        const filmBackdropUrl = await isDefaultBackdropAvailable(dom)
 
-            // inject backdrop child
-            backdropContainer.innerHTML = `
+        // get tmdb id
+        let tmdbElement
+        if (dom) {
+            tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
+        } else {
+            tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+        }
+        const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
+        const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
+
+        if (tmdbIdType && tmdbId) {
+            setItemData(filmId, "type", tmdbIdType)
+            setItemData(filmId, "tmdbId", tmdbId)
+        }
+
+        if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`)) {
+            return await getTmdbBackdrop(tmdbIdType, tmdbId)
+        }
+
+        return filmBackdropUrl
+    }
+
+    function scrapeFilmPage(filmName) {
+        return new Promise((resolve) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: `https://letterboxd.com/film/${filmName}/`,
+                onload: async function (response) {
+                    const parser = new DOMParser()
+                    const dom = parser.parseFromString(response.responseText, "text/html")
+
+                    // [url, isCached]
+                    resolve([await extractBackdropUrlFromLetterboxdFilmPage(`f/${filmName}`, dom), false])
+                },
+                onerror: function (error) {
+                    console.error(`Can't scrape Letterboxd page: ${firstPosterElement.href}`, error)
+                    resolve([null, false])
+                },
+            })
+        })
+    }
+
+    async function scrapeFilmLinkElement(selector, shouldScrape, itemId) {
+        const firstPosterElement = await waitForElement(selector, 2000)
+        if (!firstPosterElement) return [null, false]
+
+        const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
+        const filmId = `f/${filmName}`
+
+        if (!itemId.startsWith("f/")) setItemData(itemId, "fId", filmId)
+
+        const cacheBackdrop = getItemData(filmId, "bUrl")
+
+        if (cacheBackdrop) {
+            return [cacheBackdrop, true]
+        } else if (!shouldScrape) {
+            return [null, false]
+        } else {
+            return await scrapeFilmPage(filmName)
+        }
+    }
+
+    function injectBackdrop(header, backdropUrl, attributes = []) {
+        // get or inject backdrop containers
+        const backdropContainer =
+            // for patron users who already have an backdrop
+            document.querySelector(".backdrop-container") ||
+            // for non-patron users
+            Object.assign(document.createElement("div"), { className: "backdrop-container" })
+
+        // inject necessary classes
+        document.body.classList.add("backdropped", "backdrop-loaded", ...attributes)
+        document.getElementById("content")?.classList.add("-backdrop")
+
+        // inject backdrop child
+        backdropContainer.innerHTML = `
                 <div id="backdrop" class="backdrop-wrapper -loaded" data-backdrop="${backdropUrl}" data-backdrop2x="${backdropUrl}" data-backdrop-mobile="${backdropUrl}" data-offset="0">
                     <div class="backdropimage js-backdrop-image" style="background-image: url(${backdropUrl}); background-position: center 0px;"></div>
                     <div class="backdropmask js-backdrop-fade"></div>
                 </div>`
 
-            header.before(backdropContainer)
-        }
+        header.before(backdropContainer)
+    }
 
-        return {
-            waitForElement: waitForElement,
-            getTmdbBackdrop: getTmdbBackdrop,
-            extractBackdropUrlFromLetterboxdFilmPage: extractBackdropUrlFromLetterboxdFilmPage,
-            scrapeFilmPage: scrapeFilmPage,
-            scrapeFilmLinkElement: scrapeFilmLinkElement,
-            isDefaultBackdropAvailable: isDefaultBackdropAvailable,
-            injectBackdrop: injectBackdrop,
-        }
-    })()
-
-    function injectContextMenuToAllPosterItems({ itemId, name } = {}) {
+    function injectContextMenuToAllFilmPosterItems({ itemId, name } = {}) {
         function addFilmOption({ menu, className, name, onClick = () => {}, itemId = undefined } = {}) {
             if (menu.querySelector(`.${className}`)) return
 
@@ -701,7 +681,6 @@
             const backdropLink = document.createElement("a")
             backdropLink.style.cursor = "pointer"
             backdropLink.textContent = name
-
             backdropItem.onclick = () => {
                 menu.setAttribute("hidden", "")
                 onClick(filmName, itemId)
@@ -745,14 +724,14 @@
     async function filmPageInjector() {
         const filmId = `f/${location.pathname.split("/")?.[2]}`
 
-        const header = await commonUtils.waitForElement("#header")
-        injectContextMenuToAllPosterItems()
+        const header = await waitForElement("#header")
+        injectContextMenuToAllFilmPosterItems()
 
         const cacheBackdrop = getItemData(filmId, "bUrl")
 
         async function scrapeTmdbIdAndType() {
             // extracts tmdb id and type
-            const tmdbElement = await commonUtils.waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+            const tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
             const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
             const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
@@ -764,23 +743,23 @@
 
         if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            injectBackdrop(header, cacheBackdrop, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             scrapeTmdbIdAndType()
             return
         }
 
         // if original backdrop is available then return
-        if (await commonUtils.isDefaultBackdropAvailable()) {
+        if (await isDefaultBackdropAvailable()) {
             scrapeTmdbIdAndType()
             return
         }
 
         if (getConfigData("TMDB_API_KEY") && getConfigData("FILM_DISPLAY_MISSING_BACKDROP")) {
-            const backdropUrl = await commonUtils.extractBackdropUrlFromLetterboxdFilmPage(filmId)
+            const backdropUrl = await extractBackdropUrlFromLetterboxdFilmPage(filmId)
 
             // inject backdrop
             if (backdropUrl) {
-                commonUtils.injectBackdrop(header, backdropUrl, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                injectBackdrop(header, backdropUrl, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
                 setItemData(filmId, "bUrl", backdropUrl)
             }
@@ -801,27 +780,27 @@
 
         const cacheBackdrop = getItemData(userId, "bUrl")
 
-        const header = await commonUtils.waitForElement("#header")
-        injectContextMenuToAllPosterItems({ itemId: userId, name: "user" })
+        const header = await waitForElement("#header")
+        injectContextMenuToAllFilmPosterItems({ itemId: userId, name: "user" })
 
         if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            commonUtils.scrapeFilmLinkElement(filmElementSelector, false, userId)
+            injectBackdrop(header, cacheBackdrop, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            scrapeFilmLinkElement(filmElementSelector, false, userId)
             return
         }
 
         // if original backdrop is available then return
-        if (await commonUtils.isDefaultBackdropAvailable()) {
-            commonUtils.scrapeFilmLinkElement(filmElementSelector, false, userId)
+        if (await isDefaultBackdropAvailable()) {
+            scrapeFilmLinkElement(filmElementSelector, false, userId)
             return
         }
 
-        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(filmElementSelector, getConfigData("USER_AUTO_SCRAPE"), userId)
+        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("USER_AUTO_SCRAPE"), userId)
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            injectBackdrop(header, scrapedImage, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
             if (isCached) return
 
@@ -836,30 +815,30 @@
 
         const cacheBackdrop = getItemData(listId, "bUrl")
 
-        const header = await commonUtils.waitForElement("#header")
-        injectContextMenuToAllPosterItems({ itemId: listId, name: "list" })
+        const header = await waitForElement("#header")
+        injectContextMenuToAllFilmPosterItems({ itemId: listId, name: "list" })
 
         // remove short backdrop classnames for non custom backrop list pages
         if (!getConfigData("LIST_SHORT_BACKDROP")) document.body.classList.remove("shortbackdropped", "-crop")
 
         if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            commonUtils.scrapeFilmLinkElement(filmElementSelector, false, listId)
+            injectBackdrop(header, cacheBackdrop, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            scrapeFilmLinkElement(filmElementSelector, false, listId)
             return
         }
 
         // if original backdrop is available then return
-        if (await commonUtils.isDefaultBackdropAvailable()) {
-            commonUtils.scrapeFilmLinkElement(filmElementSelector, false, listId)
+        if (await isDefaultBackdropAvailable()) {
+            scrapeFilmLinkElement(filmElementSelector, false, listId)
             return
         }
 
-        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(filmElementSelector, getConfigData("LIST_AUTO_SCRAPE"), listId)
+        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("LIST_AUTO_SCRAPE"), listId)
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            injectBackdrop(header, scrapedImage, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
             if (isCached) return
 
@@ -874,27 +853,27 @@
 
         const cacheBackdrop = getItemData(personId, "bUrl")
 
-        const header = await commonUtils.waitForElement("#header")
-        injectContextMenuToAllPosterItems({ itemId: personId, name: "person" })
+        const header = await waitForElement("#header")
+        injectContextMenuToAllFilmPosterItems({ itemId: personId, name: "person" })
 
         if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            commonUtils.scrapeFilmLinkElement(filmElementSelector, false, personId)
+            injectBackdrop(header, cacheBackdrop, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            scrapeFilmLinkElement(filmElementSelector, false, personId)
             return
         }
 
         // if original backdrop is available then return
-        if (await commonUtils.isDefaultBackdropAvailable()) {
-            commonUtils.scrapeFilmLinkElement(filmElementSelector, false, personId)
+        if (await isDefaultBackdropAvailable()) {
+            scrapeFilmLinkElement(filmElementSelector, false, personId)
             return
         }
 
-        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(filmElementSelector, getConfigData("PERSON_AUTO_SCRAPE"), personId)
+        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("PERSON_AUTO_SCRAPE"), personId)
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            injectBackdrop(header, scrapedImage, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
             if (isCached) return
 
@@ -910,23 +889,23 @@
 
         const cacheBackdrop = getItemData(filmId, "bUrl")
 
-        const header = await commonUtils.waitForElement("#header")
-        injectContextMenuToAllPosterItems()
+        const header = await waitForElement("#header")
+        injectContextMenuToAllFilmPosterItems()
 
         if (cacheBackdrop) {
             // inject backdrop
-            commonUtils.injectBackdrop(header, cacheBackdrop, getConfigData("REVIEW_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+            injectBackdrop(header, cacheBackdrop, getConfigData("REVIEW_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
             return
         }
 
         // if original backdrop is available then return
-        if (await commonUtils.isDefaultBackdropAvailable()) return
+        if (await isDefaultBackdropAvailable()) return
 
-        const [scrapedImage, isCached] = await commonUtils.scrapeFilmLinkElement(filmElementSelector, getConfigData("REVIEW_AUTO_SCRAPE"), filmId)
+        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("REVIEW_AUTO_SCRAPE"), filmId)
 
         // inject backdrop
         if (scrapedImage) {
-            commonUtils.injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
+            injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
 
             if (isCached) return
 
@@ -938,28 +917,28 @@
 
     const currentURL = location.protocol + "//" + location.hostname + location.pathname
 
-    if (
-        /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/.test(currentURL) &&
+    const filmPageRegex = /^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/
+    const userPageRegex = /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/
+    const listPageRegex =
+        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/
+    const personPageRegex =
+        /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
+    const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
+
+    if (filmPageRegex.test(currentURL)) {
+        filmPageInjector()
+    } else if (
+        userPageRegex.test(currentURL) &&
         !["/settings/", "/films/", "/lists/", "/members/", "/journal/", "/sign-in/", "/create-account/", "/pro/"].some((ending) =>
             currentURL.toLowerCase().endsWith(ending)
         )
     ) {
         userPageInjector()
-    } else if (/^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/.test(currentURL)) {
-        filmPageInjector()
-    } else if (
-        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/.test(
-            currentURL
-        )
-    ) {
+    } else if (listPageRegex.test(currentURL)) {
         listPageInjector()
-    } else if (
-        /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/.test(
-            currentURL
-        )
-    ) {
+    } else if (personPageRegex.test(currentURL)) {
         personPageInjector()
-    } else if (/^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/.test(currentURL)) {
+    } else if (reviewPageRegex.test(currentURL)) {
         reviewPageInjector()
     }
 })()
