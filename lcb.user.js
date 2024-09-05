@@ -212,9 +212,23 @@
             margin-top: 20px;
             align-self: center;
         }
+        #lcb-loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #4caf50;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         `)
 
-    async function showImageUrlPopup(itemId, filmElementSelector) {
+    async function showImageUrlPopup({ itemId, filmElementSelector, specifiedFilmId } = {}) {
         // Create overlay element
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
@@ -257,9 +271,19 @@
 
         if (!getConfigData("TMDB_API_KEY")) return
 
+        // Add spinner element
+        const spinner = document.createElement("div")
+        spinner.id = "lcb-loading-spinner"
+        popup.appendChild(spinner)
+
         let filmId, tmdbIdType, tmdbId
 
-        if (itemId.startsWith("f/") && getItemData(itemId, "tmdbId")) {
+        if (specifiedFilmId && getItemData(specifiedFilmId, "tmdbId")) {
+            filmId = specifiedFilmId
+        } else if (specifiedFilmId && !getItemData(specifiedFilmId, "tmdbId")) {
+            await commonUtils.scrapeFilmPage(specifiedFilmId.split("/")?.[1])
+            filmId = specifiedFilmId
+        } else if (itemId.startsWith("f/") && getItemData(itemId, "tmdbId")) {
             filmId = itemId
         } else if (itemId.startsWith("f/") && !getItemData(itemId, "tmdbId")) {
             await commonUtils.scrapeFilmPage(itemId.split("/")?.[1])
@@ -308,6 +332,10 @@
         let currentRow = 0
         const rowsToLoad = 5
 
+        // Remove spinner and load images
+        await loadMoreImages()
+        spinner.remove()
+
         async function loadMoreImages() {
             const nextImages = allImageUrls.slice(currentRow * 3, (currentRow + rowsToLoad) * 3)
             nextImages.forEach((file_path) => {
@@ -332,8 +360,6 @@
                 loadMoreButton.style.display = "none"
             }
         }
-
-        loadMoreImages()
     }
 
     function showSettingsPopup() {
@@ -664,6 +690,60 @@
         }
     })()
 
+    function injectContextMenuToAllPosterItems(itemId) {
+        function addFilmOption({ menu, className, name, onClick = () => {}, itemId = undefined } = {}) {
+            if (menu.querySelector(`.${className}`)) return
+
+            const activityLink = menu.querySelector(".fm-show-activity a")
+            const filmName = activityLink.href.match(/\/film\/([^\/]+)/)?.[1]
+
+            const backdropItem = document.createElement("li")
+            backdropItem.classList.add(className, "popmenu-textitem", "-centered")
+
+            const backdropLink = document.createElement("a")
+            backdropLink.style.cursor = "pointer"
+            backdropLink.textContent = name
+
+            backdropItem.onclick = () => {
+                menu.setAttribute("hidden", "")
+                onClick(filmName, itemId)
+            }
+
+            backdropItem.appendChild(backdropLink)
+
+            const activityItem = menu.querySelector(".fm-show-activity")
+            activityItem.parentNode.insertBefore(backdropItem, activityItem)
+        }
+
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.matches('.popmenu.film-poster-popmenu:has(>ul >li > a[href*="/film/"])')) {
+                            if (itemId) {
+                                addFilmOption({
+                                    menu: node,
+                                    className: "fm-set-as-backdrop",
+                                    name: "Set as backdrop",
+                                    onClick: (filmName, itemId) => showImageUrlPopup({ itemId: itemId, specifiedFilmId: `f/${filmName}` }),
+                                    itemId: itemId,
+                                })
+                            }
+                            addFilmOption({
+                                menu: node,
+                                className: "fm-set-film-backdrop",
+                                name: "Set film backdrop",
+                                onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
+                            })
+                        }
+                    }
+                })
+            })
+        })
+
+        observer.observe(document.body, { childList: true, subtree: true })
+    }
+
     async function filmPageContextMenuInjector(filmId, filmElementSelector) {
         const panelRateElement = await commonUtils.waitForElement("li.panel-rate", 2000)
 
@@ -672,7 +752,7 @@
         const anchor = document.createElement("a")
         anchor.textContent = "Set film backdrop"
         anchor.style.cursor = "pointer"
-        anchor.onclick = () => showImageUrlPopup(filmId, filmElementSelector)
+        anchor.onclick = () => showImageUrlPopup({ itemId: filmId, filmElementSelector: filmElementSelector })
         setFilmBackdropMenu.appendChild(anchor)
 
         panelRateElement.parentNode.insertBefore(setFilmBackdropMenu, panelRateElement.nextSibling)
@@ -734,7 +814,7 @@
         setProfileBackdropMenuButton.type = "button"
         setProfileBackdropMenuButton.role = "menuitem"
         setProfileBackdropMenuButton.setAttribute("data-dismiss", "dropdown")
-        setProfileBackdropMenuButton.onclick = () => showImageUrlPopup(userId, filmElementSelector)
+        setProfileBackdropMenuButton.onclick = () => showImageUrlPopup({ itemId: userId, filmElementSelector: filmElementSelector })
 
         setProfileBackdropMenuButton.innerHTML = `
             <svg class="glyph" role="presentation" width="8" height="8" viewBox="0 0 16 16" style="margin-bottom: 6px">
@@ -771,6 +851,7 @@
 
         const header = await commonUtils.waitForElement("#header")
         profilePageContextMenuInjector(userId, filmElementSelector)
+        injectContextMenuToAllPosterItems(userId)
 
         if (cacheBackdrop) {
             // inject backdrop
@@ -805,7 +886,7 @@
         const anchor = document.createElement("a")
         anchor.textContent = "Set list backdrop"
         anchor.style.cursor = "pointer"
-        anchor.onclick = () => showImageUrlPopup(listId, filmElementSelector)
+        anchor.onclick = () => showImageUrlPopup({ itemId: listId, filmElementSelector: filmElementSelector })
         setListBackdropMenu.appendChild(anchor)
 
         panelRateElement.parentNode.insertBefore(setListBackdropMenu, panelRateElement.nextSibling)
@@ -820,6 +901,7 @@
 
         const header = await commonUtils.waitForElement("#header")
         listPageContextMenuInjector(listId, filmElementSelector)
+        injectContextMenuToAllPosterItems(listId)
 
         // remove short backdrop classnames for non custom backrop list pages
         if (!getConfigData("LIST_SHORT_BACKDROP")) document.body.classList.remove("shortbackdropped", "-crop")
@@ -873,7 +955,7 @@
             setPersonBackdropButton.style.color = "#9ab"
         })
 
-        setPersonBackdropButton.onclick = () => showImageUrlPopup(personId, filmElementSelector)
+        setPersonBackdropButton.onclick = () => showImageUrlPopup({ itemId: personId, filmElementSelector: filmElementSelector })
 
         personImageElement.parentNode.insertBefore(setPersonBackdropButton, personImageElement.nextSibling)
     }
@@ -887,6 +969,7 @@
 
         const header = await commonUtils.waitForElement("#header")
         personPageContextMenuInjector(personId, filmElementSelector)
+        injectContextMenuToAllPosterItems(personId)
 
         if (cacheBackdrop) {
             // inject backdrop
