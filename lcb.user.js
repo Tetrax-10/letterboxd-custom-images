@@ -710,9 +710,8 @@
         document.getElementById("content")?.classList.add("-backdrop")
 
         // make sure to inject .-backdrop to #content if its missed before
-        setTimeout(() => {
-            document.getElementById("content")?.classList.add("-backdrop")
-        }, 500)
+        const intervalId = setInterval(() => document.getElementById("content")?.classList.add("-backdrop"), 100)
+        setTimeout(() => clearInterval(intervalId), 5000)
 
         // inject backdrop child
         backdropContainer.innerHTML = `
