@@ -3,7 +3,7 @@
 // @description  Adds a custom backdrop to your profile, list and film pages that don’t have one
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-backdrops
-// @version      2.0
+// @version      3.0
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
