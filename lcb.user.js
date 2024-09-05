@@ -45,6 +45,14 @@
 
     if (GM_getValue("CONFIG", {})?.FILM_SHORT_BACKDROP === undefined) {
         GM_setValue("CONFIG", defaultConfig)
+    } else {
+        const config = GM_getValue("CONFIG", {})
+        Object.entries(defaultConfig).forEach(([key, value]) => {
+            if (config[key] === undefined) {
+                config[key] = value
+            }
+        })
+        GM_setValue("CONFIG", config)
     }
 
     function getConfigData(configId) {
@@ -581,7 +589,7 @@
         return false
     }
 
-    async function extractBackdropUrlFromLetterboxdFilmPage(filmId, dom) {
+    async function extractBackdropUrlFromLetterboxdFilmPage(filmId, dom, shouldScrape = true) {
         const filmBackdropUrl = await isDefaultBackdropAvailable(dom)
 
         // get tmdb id
@@ -599,7 +607,7 @@
             setItemData(filmId, "tmdbId", tmdbId)
         }
 
-        if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`)) {
+        if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`) && shouldScrape) {
             return await getTmdbBackdrop(tmdbIdType, tmdbId)
         }
 
@@ -763,6 +771,8 @@
 
                 setItemData(filmId, "bUrl", backdropUrl)
             }
+        } else {
+            extractBackdropUrlFromLetterboxdFilmPage(filmId, undefined, false)
         }
     }
 
