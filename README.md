@@ -10,6 +10,10 @@ All the customization this userscript provides is local and won't be visible to 
 2. Then, [click here and press install](https://tetrax-10.github.io/letterboxd-custom-backdrops/lcb.user.js).
 3. Done! 🎉
 
+## Demo
+
+https://github.com/user-attachments/assets/2cb11c80-5b30-440d-ba17-c960e5adaf8b
+
 <br>
 
 ### Customize Profile Backdrops
