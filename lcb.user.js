@@ -72,18 +72,56 @@
     function getItemData(itemId, dataType) {
         const itemData = GM_getValue("ITEM_DATA", {})
 
-        return itemData[itemId]?.[dataType] ?? ""
+        let value = itemData[itemId]?.[dataType] ?? ""
+
+        switch (dataType) {
+            case "bu":
+                if (value.startsWith("t/")) {
+                    value = `https://image.tmdb.org/t/p/original/${value.slice(2)}.jpg`
+                }
+                break
+            case "ty":
+                if (value === "m") {
+                    value = "movie"
+                } else {
+                    value = "tv"
+                }
+                break
+        }
+
+        return value
     }
 
     function setItemData(itemId, dataType, value) {
         const itemData = GM_getValue("ITEM_DATA", {})
 
         const data = itemData[itemId] ?? {}
+
         if (value === "") {
             delete data[dataType]
         } else {
-            data[dataType] = value
+            switch (dataType) {
+                case "bu":
+                    if (value.startsWith("https://image.tmdb.org/t/p/original")) {
+                        const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
+                        if (id) data[dataType] = `t/${id}`
+                    } else {
+                        data[dataType] = value
+                    }
+                    break
+                case "ty":
+                    if (value === "movie") {
+                        data[dataType] = "m"
+                    } else {
+                        data[dataType] = "t"
+                    }
+                    break
+                default:
+                    data[dataType] = value
+                    break
+            }
         }
+
         itemData[itemId] = data
 
         GM_setValue("ITEM_DATA", itemData)
@@ -253,12 +291,12 @@
 
         const input = document.createElement("input")
         input.type = "text"
-        input.value = getItemData(itemId, "bUrl")
+        input.value = getItemData(itemId, "bu")
         input.placeholder = "Backdrop Image URL"
         input.autofocus = true
         input.oninput = (e) => {
             const value = e.target.value?.trim() ?? ""
-            setItemData(itemId, "bUrl", value)
+            setItemData(itemId, "bu", value)
         }
         popup.appendChild(input)
 
@@ -282,22 +320,22 @@
         let filmId, tmdbIdType, tmdbId
 
         // "Set as backdrop" contextmenu
-        if (targetedFilmId && getItemData(targetedFilmId, "tmdbId")) {
+        if (targetedFilmId && getItemData(targetedFilmId, "tId")) {
             filmId = targetedFilmId
-        } else if (targetedFilmId && !getItemData(targetedFilmId, "tmdbId")) {
+        } else if (targetedFilmId && !getItemData(targetedFilmId, "tId")) {
             await scrapeFilmPage(targetedFilmId.split("/")?.[1])
             filmId = targetedFilmId
         }
         // "Set film backdrop" contextmenu (film and review pages)
-        else if (itemId.startsWith("f/") && getItemData(itemId, "tmdbId")) {
+        else if (itemId.startsWith("f/") && getItemData(itemId, "tId")) {
             filmId = itemId
-        } else if (itemId.startsWith("f/") && !getItemData(itemId, "tmdbId")) {
+        } else if (itemId.startsWith("f/") && !getItemData(itemId, "tId")) {
             await scrapeFilmPage(itemId.split("/")?.[1])
             filmId = itemId
         }
 
-        tmdbIdType = getItemData(filmId, "type")
-        tmdbId = getItemData(filmId, "tmdbId")
+        tmdbIdType = getItemData(filmId, "ty")
+        tmdbId = getItemData(filmId, "tId")
 
         if (!tmdbIdType || !tmdbId) return
 
@@ -350,7 +388,7 @@
                 imageItem.appendChild(img)
 
                 imageItem.onclick = () => {
-                    setItemData(itemId, "bUrl", imageUrl)
+                    setItemData(itemId, "bu", imageUrl)
                     closePopup(overlay)
                 }
                 imageGrid.appendChild(imageItem)
@@ -603,8 +641,8 @@
         const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
         if (tmdbIdType && tmdbId) {
-            setItemData(filmId, "type", tmdbIdType)
-            setItemData(filmId, "tmdbId", tmdbId)
+            setItemData(filmId, "ty", tmdbIdType)
+            setItemData(filmId, "tId", tmdbId)
         }
 
         if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`) && shouldScrape) {
@@ -643,7 +681,7 @@
 
         if (!itemId.startsWith("f/")) setItemData(itemId, "fId", filmId)
 
-        const cacheBackdrop = getItemData(filmId, "bUrl")
+        const cacheBackdrop = getItemData(filmId, "bu")
 
         if (cacheBackdrop) {
             return [cacheBackdrop, true]
@@ -735,7 +773,7 @@
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems()
 
-        const cacheBackdrop = getItemData(filmId, "bUrl")
+        const cacheBackdrop = getItemData(filmId, "bu")
 
         async function scrapeTmdbIdAndType() {
             // extracts tmdb id and type
@@ -744,8 +782,8 @@
             const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
             if (tmdbIdType && tmdbId) {
-                setItemData(filmId, "type", tmdbIdType)
-                setItemData(filmId, "tmdbId", tmdbId)
+                setItemData(filmId, "ty", tmdbIdType)
+                setItemData(filmId, "tId", tmdbId)
             }
         }
 
@@ -769,7 +807,7 @@
             if (backdropUrl) {
                 injectBackdrop(header, backdropUrl, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
-                setItemData(filmId, "bUrl", backdropUrl)
+                setItemData(filmId, "bu", backdropUrl)
             }
         } else {
             extractBackdropUrlFromLetterboxdFilmPage(filmId, undefined, false)
@@ -788,7 +826,7 @@
 
         if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && location.pathname.split("/")?.[1] !== loggedInAs) return
 
-        const cacheBackdrop = getItemData(userId, "bUrl")
+        const cacheBackdrop = getItemData(userId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems({ itemId: userId, name: "user" })
@@ -814,7 +852,7 @@
 
             if (isCached) return
 
-            setItemData(userId, "bUrl", scrapedImage)
+            setItemData(userId, "bu", scrapedImage)
         }
     }
 
@@ -823,7 +861,7 @@
 
         const filmElementSelector = ".poster-list > li:first-child a"
 
-        const cacheBackdrop = getItemData(listId, "bUrl")
+        const cacheBackdrop = getItemData(listId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems({ itemId: listId, name: "list" })
@@ -852,7 +890,7 @@
 
             if (isCached) return
 
-            setItemData(listId, "bUrl", scrapedImage)
+            setItemData(listId, "bu", scrapedImage)
         }
     }
 
@@ -861,7 +899,7 @@
 
         const filmElementSelector = ".grid > li:first-child a"
 
-        const cacheBackdrop = getItemData(personId, "bUrl")
+        const cacheBackdrop = getItemData(personId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems({ itemId: personId, name: "person" })
@@ -887,7 +925,7 @@
 
             if (isCached) return
 
-            setItemData(personId, "bUrl", scrapedImage)
+            setItemData(personId, "bu", scrapedImage)
         }
     }
 
@@ -897,7 +935,7 @@
 
         const filmElementSelector = `.film-poster a[href^="/film/"]`
 
-        const cacheBackdrop = getItemData(filmId, "bUrl")
+        const cacheBackdrop = getItemData(filmId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems()
@@ -919,7 +957,7 @@
 
             if (isCached) return
 
-            setItemData(filmId, "bUrl", scrapedImage)
+            setItemData(filmId, "bu", scrapedImage)
         }
     }
 
