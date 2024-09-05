@@ -719,7 +719,7 @@
         header.before(backdropContainer)
     }
 
-    function injectContextMenuToAllFilmPosterItems({ itemId, name } = {}) {
+    async function injectContextMenuToAllFilmPosterItems({ itemId, name } = {}) {
         function addFilmOption({ menu, className, name, onClick = () => {}, itemId = undefined } = {}) {
             if (menu.querySelector(`.${className}`)) return
 
@@ -769,6 +769,7 @@
             })
         })
 
+        await waitForElement("body")
         observer.observe(document.body, { childList: true, subtree: true })
     }
 
@@ -993,5 +994,7 @@
         personPageInjector()
     } else if (reviewPageRegex.test(currentURL)) {
         reviewPageInjector()
+    } else {
+        injectContextMenuToAllFilmPosterItems()
     }
 })()
