@@ -787,7 +787,7 @@
         }
     }
 
-    async function profilePageInjector() {
+    async function userPageInjector() {
         const userId = `u/${location.pathname.split("/")?.[1]}`
 
         const filmElementSelector = "#favourites .poster-list > li:first-child a"
@@ -802,7 +802,7 @@
         const cacheBackdrop = getItemData(userId, "bUrl")
 
         const header = await commonUtils.waitForElement("#header")
-        injectContextMenuToAllPosterItems({ itemId: userId, name: "profile" })
+        injectContextMenuToAllPosterItems({ itemId: userId, name: "user" })
 
         if (cacheBackdrop) {
             // inject backdrop
@@ -944,7 +944,7 @@
             currentURL.toLowerCase().endsWith(ending)
         )
     ) {
-        profilePageInjector()
+        userPageInjector()
     } else if (/^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/.test(currentURL)) {
         filmPageInjector()
     } else if (
