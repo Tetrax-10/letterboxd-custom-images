@@ -745,9 +745,12 @@
 
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        if (node.matches('.popmenu.film-poster-popmenu:has(>ul >li > a[href*="/film/"])')) {
+                if (mutation.type === "childList") {
+                    mutation.addedNodes.forEach((node) => {
+                        if (
+                            node.nodeType === Node.ELEMENT_NODE &&
+                            node.matches(`body > .popmenu.film-poster-popmenu:has(>ul >li >a[href*="/film/"])`)
+                        ) {
                             if (itemId) {
                                 addFilmOption({
                                     menu: node,
@@ -764,13 +767,13 @@
                                 onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
                             })
                         }
-                    }
-                })
+                    })
+                }
             })
         })
 
         await waitForElement("body")
-        observer.observe(document.body, { childList: true, subtree: true })
+        observer.observe(document.body, { childList: true })
     }
 
     async function filmPageInjector() {
