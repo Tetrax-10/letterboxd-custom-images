@@ -3,7 +3,7 @@
 // @description  Adds a custom backdrop to your profile, list and film pages that don’t have one
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-backdrops
-// @version      3.0
+// @version      3.1
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
@@ -27,6 +27,7 @@
         ?.split("; ")
         ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
         ?.split("=")[1]
+        ?.toLowerCase()
 
     const defaultConfig = {
         TMDB_API_KEY: "",
@@ -828,11 +829,12 @@
     }
 
     async function userPageInjector() {
-        const userId = `u/${location.pathname.split("/")?.[1]}`
+        const userName = location.pathname.split("/")?.[1]?.toLowerCase()
+        const userId = `u/${userName}`
 
         const filmElementSelector = "#favourites .poster-list > li:first-child a"
 
-        if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && location.pathname.split("/")?.[1] !== loggedInAs) return
+        if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && userName !== loggedInAs) return
 
         const cacheBackdrop = getItemData(userId, "bu")
 
@@ -865,7 +867,7 @@
     }
 
     async function listPageInjector() {
-        const listId = `l/${location.pathname.split("/")?.[1]}/${location.pathname.split("/")?.[3]}`
+        const listId = `l/${location.pathname.split("/")?.[1]?.toLowerCase()}/${location.pathname.split("/")?.[3]}`
 
         const filmElementSelector = ".poster-list > li:first-child a"
 
