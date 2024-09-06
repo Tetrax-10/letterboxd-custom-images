@@ -3,7 +3,7 @@
 // @description  Adds a custom backdrop to your profile, list and film pages that don’t have one
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-backdrops
-// @version      3.1
+// @version      3.2
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
@@ -17,6 +17,8 @@
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_listValues
+// @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
 
@@ -75,62 +77,157 @@
         GM_setValue("CONFIG", config)
     }
 
-    function getItemData(itemId, dataType) {
-        const itemData = GM_getValue("ITEM_DATA", {})
-
-        let value = itemData[itemId]?.[dataType] ?? ""
-
-        switch (dataType) {
-            case "bu":
-                if (value.startsWith("t/")) {
-                    value = `https://image.tmdb.org/t/p/original/${value.slice(2)}.jpg`
+    let db = null
+    let upgradeNeeded = false
+    function openDb() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open("ItemDataDB", 1)
+            request.onupgradeneeded = (event) => {
+                db = event.target.result
+                if (!db.objectStoreNames.contains("itemData")) {
+                    db.createObjectStore("itemData", { keyPath: "itemId" })
+                    upgradeNeeded = true
                 }
-                break
-            case "ty":
-                if (value === "m") {
-                    value = "movie"
-                } else {
-                    value = "tv"
-                }
-                break
-        }
-
-        return value
+            }
+            request.onsuccess = (event) => {
+                db = event.target.result
+                resolve(db)
+            }
+            request.onerror = (event) => {
+                console.error("Error opening database:", event.target.errorCode)
+                reject(event.target.errorCode)
+            }
+        })
     }
 
-    function setItemData(itemId, dataType, value) {
-        const itemData = GM_getValue("ITEM_DATA", {})
+    async function getDatabase() {
+        if (!db) db = await openDb()
+        return db
+    }
 
-        const data = itemData[itemId] ?? {}
-
-        if (value === "") {
-            delete data[dataType]
-        } else {
-            switch (dataType) {
-                case "bu":
-                    if (value.startsWith("https://image.tmdb.org/t/p/original")) {
-                        const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
-                        if (id) data[dataType] = `t/${id}`
-                    } else {
-                        data[dataType] = value
-                    }
-                    break
-                case "ty":
-                    if (value === "movie") {
-                        data[dataType] = "m"
-                    } else {
-                        data[dataType] = "t"
-                    }
-                    break
-                default:
-                    data[dataType] = value
-                    break
+    getDatabase().then(async () => {
+        // Migrate old data
+        if (upgradeNeeded) {
+            const ITEM_DATA = GM_getValue("ITEM_DATA", {})
+            if (Object.keys(ITEM_DATA).length) {
+                await setItemData(ITEM_DATA)
             }
         }
 
-        itemData[itemId] = data
+        // Delete old data
+        let allKeys = GM_listValues()
+        for (let i = 0; i < allKeys.length; i++) {
+            const key = allKeys[i]
+            if (key !== "CONFIG") {
+                GM_deleteValue(key)
+            }
+        }
+    })
 
-        GM_setValue("ITEM_DATA", itemData)
+    async function getItemData(itemId, dataType) {
+        const db = await getDatabase()
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction("itemData", "readonly")
+            const store = transaction.objectStore("itemData")
+
+            if (!itemId) {
+                const request = store.getAll()
+
+                request.onsuccess = (event) => {
+                    const items = event.target.result
+                    const result = {}
+
+                    items.forEach((item) => {
+                        const itemId = item.itemId
+                        delete item.itemId
+                        result[itemId] = item
+                    })
+                    resolve(result)
+                }
+
+                request.onerror = (event) => reject(event.target.error)
+                return
+            }
+
+            const request = store.get(itemId)
+
+            request.onsuccess = (event) => {
+                const itemData = event.target.result || {}
+                let value = itemData[dataType] ?? ""
+
+                switch (dataType) {
+                    case "bu":
+                        if (value.startsWith("t/")) {
+                            value = `https://image.tmdb.org/t/p/original/${value.slice(2)}.jpg`
+                        }
+                        break
+                    case "ty":
+                        if (value === "m") {
+                            value = "movie"
+                        } else if (value === "t") {
+                            value = "tv"
+                        }
+                        break
+                }
+
+                resolve(value)
+            }
+
+            request.onerror = (event) => reject(event.target.error)
+        })
+    }
+
+    async function setItemData(itemId, dataType, value) {
+        const db = await getDatabase()
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction("itemData", "readwrite")
+            const store = transaction.objectStore("itemData")
+
+            store.get(typeof itemId === "object" ? "" : itemId).onsuccess = (event) => {
+                const itemData = event.target.result || {}
+
+                if (typeof itemId === "object") {
+                    // Assuming itemId here is actually a full data object
+                    Object.keys(itemId).forEach((id) => {
+                        store.put({ itemId: id, ...itemId[id] })
+                    })
+                    resolve()
+                    return
+                }
+
+                const data = itemData || {}
+
+                if (!value) {
+                    delete data[dataType]
+                } else {
+                    switch (dataType) {
+                        case "bu":
+                            if (value.startsWith("https://image.tmdb.org/t/p/original")) {
+                                const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
+                                if (id) data[dataType] = `t/${id}`
+                            } else {
+                                data[dataType] = value
+                            }
+                            break
+                        case "ty":
+                            if (value === "movie") {
+                                data[dataType] = "m"
+                            } else {
+                                data[dataType] = "t"
+                            }
+                            break
+                        default:
+                            data[dataType] = value
+                            break
+                    }
+                }
+
+                store.put({ itemId, ...data })
+                resolve()
+            }
+
+            transaction.onerror = (event) => reject(event.target.error)
+        })
     }
 
     GM_addStyle(`
@@ -297,7 +394,7 @@
 
         const input = document.createElement("input")
         input.type = "text"
-        input.value = getItemData(itemId, "bu")
+        input.value = await getItemData(itemId, "bu")
         input.placeholder = "Backdrop Image URL"
         input.autofocus = true
         input.oninput = (e) => {
@@ -326,22 +423,22 @@
         let filmId, tmdbIdType, tmdbId
 
         // "Set as backdrop" contextmenu
-        if (targetedFilmId && getItemData(targetedFilmId, "tId")) {
+        if (targetedFilmId && (await getItemData(targetedFilmId, "tId"))) {
             filmId = targetedFilmId
-        } else if (targetedFilmId && !getItemData(targetedFilmId, "tId")) {
+        } else if (targetedFilmId && !(await getItemData(targetedFilmId, "tId"))) {
             await scrapeFilmPage(targetedFilmId.slice(2))
             filmId = targetedFilmId
         }
         // "Set film backdrop" contextmenu (film and review pages)
-        else if (itemId.startsWith("f/") && getItemData(itemId, "tId")) {
+        else if (itemId.startsWith("f/") && (await getItemData(itemId, "tId"))) {
             filmId = itemId
-        } else if (itemId.startsWith("f/") && !getItemData(itemId, "tId")) {
+        } else if (itemId.startsWith("f/") && !(await getItemData(itemId, "tId"))) {
             await scrapeFilmPage(itemId.slice(2))
             filmId = itemId
         }
 
-        tmdbIdType = getItemData(filmId, "ty")
-        tmdbId = getItemData(filmId, "tId")
+        tmdbIdType = await getItemData(filmId, "ty")
+        tmdbId = await getItemData(filmId, "tId")
 
         if (!tmdbIdType || !tmdbId) return
 
@@ -461,10 +558,10 @@
         }
 
         // Export settings to a JSON file
-        function exportSettings() {
+        async function exportSettings() {
             const settings = {
                 CONFIG: GM_getValue("CONFIG", {}),
-                ITEM_DATA: GM_getValue("ITEM_DATA", {}),
+                ITEM_DATA: await getItemData(),
             }
 
             // Create a data URL for the JSON file
@@ -488,7 +585,7 @@
                     const settings = JSON.parse(content)
 
                     GM_setValue("CONFIG", settings.CONFIG || {})
-                    GM_setValue("ITEM_DATA", settings.ITEM_DATA || {})
+                    setItemData(settings.ITEM_DATA || {})
 
                     // Refresh the popup to reflect imported settings
                     closePopup(overlay)
@@ -647,8 +744,8 @@
         const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
         if (tmdbIdType && tmdbId) {
-            setItemData(filmId, "ty", tmdbIdType)
-            setItemData(filmId, "tId", tmdbId)
+            await setItemData(filmId, "ty", tmdbIdType)
+            await setItemData(filmId, "tId", tmdbId)
         }
 
         if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`) && shouldScrape) {
@@ -685,9 +782,9 @@
         const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
         const filmId = `f/${filmName}`
 
-        if (!itemId.startsWith("f/")) setItemData(itemId, "fId", filmId)
+        if (!itemId.startsWith("f/")) await setItemData(itemId, "fId", filmId)
 
-        const cacheBackdrop = getItemData(filmId, "bu")
+        const cacheBackdrop = await getItemData(filmId, "bu")
 
         if (cacheBackdrop) {
             return [cacheBackdrop, true]
@@ -787,7 +884,7 @@
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems()
 
-        const cacheBackdrop = getItemData(filmId, "bu")
+        const cacheBackdrop = await getItemData(filmId, "bu")
 
         async function scrapeTmdbIdAndType() {
             // extracts tmdb id and type
@@ -796,8 +893,8 @@
             const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
             if (tmdbIdType && tmdbId) {
-                setItemData(filmId, "ty", tmdbIdType)
-                setItemData(filmId, "tId", tmdbId)
+                await setItemData(filmId, "ty", tmdbIdType)
+                await setItemData(filmId, "tId", tmdbId)
             }
         }
 
@@ -836,7 +933,7 @@
 
         if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && userName !== loggedInAs) return
 
-        const cacheBackdrop = getItemData(userId, "bu")
+        const cacheBackdrop = await getItemData(userId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems({ itemId: userId, name: "user" })
@@ -871,7 +968,7 @@
 
         const filmElementSelector = ".poster-list > li:first-child a"
 
-        const cacheBackdrop = getItemData(listId, "bu")
+        const cacheBackdrop = await getItemData(listId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems({ itemId: listId, name: "list" })
@@ -909,7 +1006,7 @@
 
         const filmElementSelector = ".grid > li:first-child a"
 
-        const cacheBackdrop = getItemData(personId, "bu")
+        const cacheBackdrop = await getItemData(personId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems({ itemId: personId, name: "person" })
@@ -945,7 +1042,7 @@
 
         const filmElementSelector = `.film-poster a[href^="/film/"]`
 
-        const cacheBackdrop = getItemData(filmId, "bu")
+        const cacheBackdrop = await getItemData(filmId, "bu")
 
         const header = await waitForElement("#header")
         injectContextMenuToAllFilmPosterItems()
