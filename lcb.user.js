@@ -1094,18 +1094,18 @@
         }
     }
 
-    async function filmPageContextMenuInjector(filmId) {
-        const panelRateElement = await waitForElement("li.panel-rate", 2000)
+    async function filmPageMenuInjector(filmId) {
+        const yourActivityMenuItem = await waitForElement(`ul.js-actions-panel > li:has(a[href*="/activity/"])`, 2000)
 
-        const setFilmBackdropMenu = document.createElement("li")
+        const setFilmBackdropMenuItem = document.createElement("li")
 
         const anchor = document.createElement("a")
         anchor.textContent = "Set film backdrop"
         anchor.style.cursor = "pointer"
         anchor.onclick = () => showImageUrlPopup({ itemId: filmId })
-        setFilmBackdropMenu.appendChild(anchor)
 
-        panelRateElement.parentNode.insertBefore(setFilmBackdropMenu, panelRateElement.nextSibling)
+        setFilmBackdropMenuItem.appendChild(anchor)
+        yourActivityMenuItem.parentNode.insertBefore(setFilmBackdropMenuItem, yourActivityMenuItem)
     }
 
     async function filmPageInjector() {
@@ -1113,7 +1113,7 @@
             const filmId = `f/${location.pathname.split("/")?.[2]}`
 
             const header = await waitForElement("#header")
-            filmPageContextMenuInjector(filmId)
+            filmPageMenuInjector(filmId)
             injectContextMenuToAllFilmPosterItems()
 
             const cacheBackdrop = await getItemData(filmId, "bu")
@@ -1163,19 +1163,18 @@
         }
     }
 
-    async function userPageContextMenuInjector(userId, filmElementSelector) {
-        const copyLinkMenu = await waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 2000)
+    async function userPageMenuInjector(userId, filmElementSelector) {
+        const copyLinkMenuItem = await waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 2000)
 
-        const setUserBackdropMenu = document.createElement("div")
-        setUserBackdropMenu.classList.add("menuitem", "-trigger", "-has-icon", "js-menuitem")
-        setUserBackdropMenu.role = "none"
+        const setUserBackdropMenuItem = document.createElement("div")
+        setUserBackdropMenuItem.classList.add("menuitem", "-trigger", "-has-icon", "js-menuitem")
+        setUserBackdropMenuItem.role = "none"
 
         const setUserBackdropMenuButton = document.createElement("button")
         setUserBackdropMenuButton.type = "button"
         setUserBackdropMenuButton.role = "menuitem"
         setUserBackdropMenuButton.setAttribute("data-dismiss", "dropdown")
         setUserBackdropMenuButton.onclick = () => showImageUrlPopup({ itemId: userId, filmElementSelector: filmElementSelector })
-
         setUserBackdropMenuButton.innerHTML = `
             <svg class="glyph" role="presentation" width="8" height="8" viewBox="0 0 16 16" style="margin-bottom: 6px">
                 <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
@@ -1191,8 +1190,8 @@
             <span class="label">Set user backdrop</span>
             `
 
-        setUserBackdropMenu.appendChild(setUserBackdropMenuButton)
-        copyLinkMenu.parentNode.insertBefore(setUserBackdropMenu, copyLinkMenu.nextSibling)
+        setUserBackdropMenuItem.appendChild(setUserBackdropMenuButton)
+        copyLinkMenuItem.parentNode.insertBefore(setUserBackdropMenuItem, copyLinkMenuItem.nextSibling)
     }
 
     async function userPageInjector() {
@@ -1205,7 +1204,7 @@
 
             const cacheBackdrop = await getItemData(userId, "bu")
             const header = await waitForElement("#header")
-            userPageContextMenuInjector(userId, filmElementSelector)
+            userPageMenuInjector(userId, filmElementSelector)
             injectContextMenuToAllFilmPosterItems({ itemId: userId, name: "user" })
 
             if (cacheBackdrop) {
@@ -1233,18 +1232,18 @@
         }
     }
 
-    async function listPageContextMenuInjector(listId, filmElementSelector) {
-        const panelRateElement = await waitForElement("li.like-link-target", 2000)
+    async function listPageMenuInjector(listId, filmElementSelector) {
+        const likeMenuItem = await waitForElement("li.like-link-target", 2000)
 
-        const setListBackdropMenu = document.createElement("li")
+        const setListBackdropMenuItem = document.createElement("li")
 
-        const anchor = document.createElement("a")
-        anchor.textContent = "Set list backdrop"
-        anchor.style.cursor = "pointer"
-        anchor.onclick = () => showImageUrlPopup({ itemId: listId, filmElementSelector: filmElementSelector })
-        setListBackdropMenu.appendChild(anchor)
+        const setListBackdropLink = document.createElement("a")
+        setListBackdropLink.textContent = "Set list backdrop"
+        setListBackdropLink.style.cursor = "pointer"
+        setListBackdropLink.onclick = () => showImageUrlPopup({ itemId: listId, filmElementSelector: filmElementSelector })
 
-        panelRateElement.parentNode.insertBefore(setListBackdropMenu, panelRateElement.nextSibling)
+        setListBackdropMenuItem.appendChild(setListBackdropLink)
+        likeMenuItem.parentNode.insertBefore(setListBackdropMenuItem, likeMenuItem.nextSibling)
     }
 
     async function listPageInjector() {
@@ -1254,7 +1253,7 @@
 
             const cacheBackdrop = await getItemData(listId, "bu")
             const header = await waitForElement("#header")
-            listPageContextMenuInjector(listId, filmElementSelector)
+            listPageMenuInjector(listId, filmElementSelector)
             injectContextMenuToAllFilmPosterItems({ itemId: listId, name: "list" })
 
             if (!getConfigData("LIST_SHORT_BACKDROP")) {
@@ -1286,13 +1285,10 @@
         }
     }
 
-    async function personPageContextMenuInjector(personId, filmElementSelector) {
+    async function personPageMenuInjector(personId, filmElementSelector) {
         const personImageElement = await waitForElement(".person-image", 2000)
 
-        // Create the button element
         const setPersonBackdropButton = document.createElement("button")
-
-        // Set the attributes and styles
         setPersonBackdropButton.style.borderRadius = "4px"
         setPersonBackdropButton.style.width = "100%"
         setPersonBackdropButton.style.border = "1px solid hsla(0,0%,100%,0.25)"
@@ -1302,14 +1298,12 @@
         setPersonBackdropButton.style.cursor = "pointer"
         setPersonBackdropButton.style.fontFamily = "Graphik-Regular-Web, sans-serif"
         setPersonBackdropButton.textContent = "Set person backdrop"
-
         setPersonBackdropButton.addEventListener("mouseenter", () => {
             setPersonBackdropButton.style.color = "#def"
         })
         setPersonBackdropButton.addEventListener("mouseleave", () => {
             setPersonBackdropButton.style.color = "#9ab"
         })
-
         setPersonBackdropButton.onclick = () => showImageUrlPopup({ itemId: personId, filmElementSelector: filmElementSelector })
 
         personImageElement.parentNode.insertBefore(setPersonBackdropButton, personImageElement.nextSibling)
@@ -1322,7 +1316,7 @@
 
             const cacheBackdrop = await getItemData(personId, "bu")
             const header = await waitForElement("#header")
-            personPageContextMenuInjector(personId, filmElementSelector)
+            personPageMenuInjector(personId, filmElementSelector)
             injectContextMenuToAllFilmPosterItems({ itemId: personId, name: "person" })
 
             if (cacheBackdrop) {
@@ -1358,7 +1352,7 @@
 
             const cacheBackdrop = await getItemData(filmId, "bu")
             const header = await waitForElement("#header")
-            filmPageContextMenuInjector(filmId)
+            filmPageMenuInjector(filmId)
             injectContextMenuToAllFilmPosterItems()
 
             if (cacheBackdrop) {
