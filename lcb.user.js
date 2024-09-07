@@ -3,7 +3,7 @@
 // @description  Adds a custom backdrop to your profile, list and film pages that don’t have one
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-backdrops
-// @version      3.2
+// @version      3.3
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
@@ -23,14 +23,18 @@
 // ==/UserScript==
 
 ;(() => {
+    // Register menu command to open settings popup
     GM_registerMenuCommand("Settings", showSettingsPopup)
 
-    const loggedInAs = document.cookie
-        ?.split("; ")
-        ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
-        ?.split("=")[1]
-        ?.toLowerCase()
+    // Retrieve logged-in username from cookies
+    const loggedInAs =
+        document.cookie
+            ?.split("; ")
+            ?.find((row) => row.startsWith("letterboxd.signed.in.as="))
+            ?.split("=")[1]
+            ?.toLowerCase() || null // Add null check for safety
 
+    // Default configuration settings
     const defaultConfig = {
         TMDB_API_KEY: "",
 
@@ -51,48 +55,72 @@
         REVIEW_SHORT_BACKDROP: true,
     }
 
-    if (GM_getValue("CONFIG", {})?.FILM_SHORT_BACKDROP === undefined) {
-        GM_setValue("CONFIG", defaultConfig)
-    } else {
-        const config = GM_getValue("CONFIG", {})
-        Object.entries(defaultConfig).forEach(([key, value]) => {
-            if (config[key] === undefined) {
-                config[key] = value
-            }
-        })
-        GM_setValue("CONFIG", config)
+    // Initialize configuration with defaults if not already set
+    try {
+        const currentConfig = GM_getValue("CONFIG", {})
+        if (currentConfig.FILM_SHORT_BACKDROP === undefined) {
+            GM_setValue("CONFIG", defaultConfig)
+            console.debug("Configuration initialized with default values.")
+        } else {
+            Object.entries(defaultConfig).forEach(([key, value]) => {
+                if (currentConfig[key] === undefined) {
+                    currentConfig[key] = value
+                    console.debug("Configuration updated with default value for", key)
+                }
+            })
+            GM_setValue("CONFIG", currentConfig)
+        }
+    } catch (error) {
+        console.error("Error initializing configuration:", error)
     }
 
+    // Function to get a specific configuration value
     function getConfigData(configId) {
-        const config = GM_getValue("CONFIG", {})
-
-        return config[configId]
+        try {
+            const config = GM_getValue("CONFIG", {})
+            return config[configId]
+        } catch (error) {
+            console.error(`Error getting config data for ${configId}:`, error)
+            return null
+        }
     }
 
+    // Function to set a specific configuration value
     function setConfigData(configId, value) {
-        const config = GM_getValue("CONFIG", {})
-
-        config[configId] = value
-
-        GM_setValue("CONFIG", config)
+        try {
+            const config = GM_getValue("CONFIG", {})
+            config[configId] = value
+            GM_setValue("CONFIG", config)
+            console.debug(`Config data for ${configId} updated.`)
+        } catch (error) {
+            console.error(`Error setting config data for ${configId}:`, error)
+        }
     }
 
+    // IndexedDB database variables
     let db = null
     let upgradeNeeded = false
+
+    // Function to open the IndexedDB database
     function openDb() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open("ItemDataDB", 1)
+
             request.onupgradeneeded = (event) => {
                 db = event.target.result
                 if (!db.objectStoreNames.contains("itemData")) {
                     db.createObjectStore("itemData", { keyPath: "itemId" })
                     upgradeNeeded = true
+                    console.debug("Database upgrade needed, object store created.")
                 }
             }
+
             request.onsuccess = (event) => {
                 db = event.target.result
+                console.debug("Database connection established.")
                 resolve(db)
             }
+
             request.onerror = (event) => {
                 console.error("Error opening database:", event.target.errorCode)
                 reject(event.target.errorCode)
@@ -100,134 +128,173 @@
         })
     }
 
+    // Function to get the database instance
     async function getDatabase() {
-        if (!db) db = await openDb()
+        if (!db)
+            db = await openDb().catch((error) => {
+                console.error("Failed to open database:", error)
+                throw error
+            })
         return db
     }
 
-    getDatabase().then(async () => {
-        // Migrate old data
-        if (upgradeNeeded) {
-            const ITEM_DATA = GM_getValue("ITEM_DATA", {})
-            if (Object.keys(ITEM_DATA).length) {
-                await setItemData(ITEM_DATA)
-            }
-        }
-
-        // Delete old data
-        let allKeys = GM_listValues()
-        for (let i = 0; i < allKeys.length; i++) {
-            const key = allKeys[i]
-            if (key !== "CONFIG") {
-                GM_deleteValue(key)
-            }
-        }
-    })
-
-    async function getItemData(itemId, dataType) {
-        const db = await getDatabase()
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction("itemData", "readonly")
-            const store = transaction.objectStore("itemData")
-
-            if (!itemId) {
-                const request = store.getAll()
-
-                request.onsuccess = (event) => {
-                    const items = event.target.result
-                    const result = {}
-
-                    items.forEach((item) => {
-                        const itemId = item.itemId
-                        delete item.itemId
-                        result[itemId] = item
+    // Initialize the database and migrate old data if needed
+    getDatabase()
+        .then(async () => {
+            if (upgradeNeeded) {
+                const ITEM_DATA = GM_getValue("ITEM_DATA", {})
+                if (Object.keys(ITEM_DATA).length) {
+                    await setItemData(ITEM_DATA).catch((error) => {
+                        console.error("Failed to migrate old item data:", error)
                     })
-                    resolve(result)
+                    console.debug("Old item data migrated.")
                 }
-
-                request.onerror = (event) => reject(event.target.error)
-                return
             }
 
-            const request = store.get(itemId)
-
-            request.onsuccess = (event) => {
-                const itemData = event.target.result || {}
-                let value = itemData[dataType] ?? ""
-
-                switch (dataType) {
-                    case "bu":
-                        if (value.startsWith("t/")) {
-                            value = `https://image.tmdb.org/t/p/original/${value.slice(2)}.jpg`
-                        }
-                        break
-                    case "ty":
-                        if (value === "m") {
-                            value = "movie"
-                        } else if (value === "t") {
-                            value = "tv"
-                        }
-                        break
+            // Clean up old stored values except for the configuration
+            let allKeys = GM_listValues()
+            for (let i = 0; i < allKeys.length; i++) {
+                const key = allKeys[i]
+                if (key !== "CONFIG") {
+                    GM_deleteValue(key)
+                    console.debug("Deleted old stored value:", key)
                 }
-
-                resolve(value)
             }
-
-            request.onerror = (event) => reject(event.target.error)
         })
-    }
+        .catch((error) => {
+            console.error("Failed to initialize database and migrate data:", error)
+        })
 
-    async function setItemData(itemId, dataType, value) {
-        const db = await getDatabase()
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction("itemData", "readwrite")
-            const store = transaction.objectStore("itemData")
+    // Function to get item data from the database
+    async function getItemData(itemId, dataType) {
+        try {
+            const db = await getDatabase()
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction("itemData", "readonly")
+                const store = transaction.objectStore("itemData")
 
-            store.get(typeof itemId === "object" ? "" : itemId).onsuccess = (event) => {
-                const itemData = event.target.result || {}
+                if (!itemId) {
+                    // Get all items if no itemId is provided
+                    const request = store.getAll()
+                    request.onsuccess = (event) => {
+                        const items = event.target.result
+                        const result = {}
 
-                if (typeof itemId === "object") {
-                    // Assuming itemId here is actually a full data object
-                    Object.keys(itemId).forEach((id) => {
-                        store.put({ itemId: id, ...itemId[id] })
-                    })
-                    resolve()
+                        items.forEach((item) => {
+                            const id = item.itemId
+                            delete item.itemId
+                            result[id] = item
+                        })
+                        resolve(result)
+                        console.debug("Retrieved all item data.")
+                    }
+
+                    request.onerror = (event) => {
+                        console.error("Error retrieving all item data:", event.target.error)
+                        reject(event.target.error)
+                    }
                     return
                 }
 
-                const data = itemData || {}
+                const request = store.get(itemId)
+                request.onsuccess = (event) => {
+                    const itemData = event.target.result || {}
+                    let value = itemData[dataType] ?? ""
 
-                if (!value) {
-                    delete data[dataType]
-                } else {
+                    // Handle specific data transformations based on dataType
                     switch (dataType) {
                         case "bu":
-                            if (value.startsWith("https://image.tmdb.org/t/p/original")) {
-                                const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
-                                if (id) data[dataType] = `t/${id}`
-                            } else {
-                                data[dataType] = value
+                            if (value.startsWith("t/")) {
+                                value = `https://image.tmdb.org/t/p/original/${value.slice(2)}.jpg`
                             }
                             break
                         case "ty":
-                            if (value === "movie") {
-                                data[dataType] = "m"
-                            } else {
-                                data[dataType] = "t"
+                            if (value === "m") {
+                                value = "movie"
+                            } else if (value === "t") {
+                                value = "tv"
                             }
                             break
-                        default:
-                            data[dataType] = value
-                            break
                     }
+
+                    resolve(value)
+                    console.debug(`Retrieved item data for ${itemId}, type: ${dataType}`)
                 }
 
-                store.put({ itemId, ...data })
-                resolve()
-            }
+                request.onerror = (event) => {
+                    console.error(`Error retrieving item data for ${itemId}:`, event.target.error)
+                    reject(event.target.error)
+                }
+            })
+        } catch (error) {
+            console.error(`Error in getItemData for itemId ${itemId} and dataType ${dataType}:`, error)
+            throw error
+        }
+    }
 
-            transaction.onerror = (event) => reject(event.target.error)
-        })
+    // Function to set item data in the database
+    async function setItemData(itemId, dataType, value) {
+        try {
+            const db = await getDatabase()
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction("itemData", "readwrite")
+                const store = transaction.objectStore("itemData")
+
+                store.get(typeof itemId === "object" ? "" : itemId).onsuccess = (event) => {
+                    const itemData = event.target.result || {}
+
+                    if (typeof itemId === "object") {
+                        // If itemId is an object, assume it's a full data object to be inserted
+                        Object.keys(itemId).forEach((id) => {
+                            store.put({ itemId: id, ...itemId[id] })
+                        })
+                        console.debug("Bulk item data inserted.")
+                        resolve()
+                        return
+                    }
+
+                    const data = itemData || {}
+
+                    // Handle specific data transformations based on dataType
+                    if (!value) {
+                        delete data[dataType]
+                    } else {
+                        switch (dataType) {
+                            case "bu":
+                                if (value.startsWith("https://image.tmdb.org/t/p/original")) {
+                                    const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
+                                    if (id) data[dataType] = `t/${id}`
+                                } else {
+                                    data[dataType] = value
+                                }
+                                break
+                            case "ty":
+                                if (value === "movie") {
+                                    data[dataType] = "m"
+                                } else {
+                                    data[dataType] = "t"
+                                }
+                                break
+                            default:
+                                data[dataType] = value
+                                break
+                        }
+                    }
+
+                    store.put({ itemId, ...data })
+                    console.debug(`Item data set for ${itemId}, type: ${dataType}`)
+                    resolve()
+                }
+
+                transaction.onerror = (event) => {
+                    console.error(`Error setting item data for ${itemId}:`, event.target.error)
+                    reject(event.target.error)
+                }
+            })
+        } catch (error) {
+            console.error(`Error in setItemData for itemId ${itemId} and dataType ${dataType}:`, error)
+            throw error
+        }
     }
 
     GM_addStyle(`
@@ -378,34 +445,46 @@
         `)
 
     async function showImageUrlPopup({ itemId, targetedFilmId } = {}) {
+        // Create overlay for the popup
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
         overlay.onclick = (e) => {
             if (e.target === overlay) closePopup(overlay)
         }
 
+        // Create popup container
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
         popup.setAttribute("type", "burlpopup")
 
+        // Add label for the input field
         const label = document.createElement("label")
         label.textContent = "Enter Backdrop Image URL:"
         popup.appendChild(label)
 
+        // Create input field for the URL
         const input = document.createElement("input")
         input.type = "text"
-        input.value = await getItemData(itemId, "bu")
+        try {
+            input.value = await getItemData(itemId, "bu") // Retrieve existing backdrop URL
+        } catch (error) {
+            console.error("Failed to retrieve backdrop URL:", error) // Log error if retrieval fails
+            input.value = ""
+        }
         input.placeholder = "Backdrop Image URL"
         input.autofocus = true
         input.oninput = (e) => {
             const value = e.target.value?.trim() ?? ""
-            setItemData(itemId, "bu", value)
+            setItemData(itemId, "bu", value).catch((err) => {
+                console.error("Failed to set backdrop URL:", err) // Log error if setting data fails
+            })
         }
         popup.appendChild(input)
 
         overlay.appendChild(popup)
         document.body.appendChild(overlay)
 
+        // Focus on the input field after a short delay
         setTimeout(() => {
             input.focus()
         }, 100)
@@ -414,97 +493,124 @@
             document.body.removeChild(overlay)
         }
 
+        // Exit if TMDB API key is not configured
         if (!getConfigData("TMDB_API_KEY")) return
 
+        // Show loading spinner
         const spinner = document.createElement("div")
         spinner.id = "lcb-loading-spinner"
         popup.appendChild(spinner)
 
         let filmId, tmdbIdType, tmdbId
 
-        // "Set as backdrop" contextmenu
-        if (targetedFilmId && (await getItemData(targetedFilmId, "tId"))) {
-            filmId = targetedFilmId
-        } else if (targetedFilmId && !(await getItemData(targetedFilmId, "tId"))) {
-            await scrapeFilmPage(targetedFilmId.slice(2))
-            filmId = targetedFilmId
-        }
-        // "Set film backdrop" contextmenu (film and review pages)
-        else if (itemId.startsWith("f/") && (await getItemData(itemId, "tId"))) {
-            filmId = itemId
-        } else if (itemId.startsWith("f/") && !(await getItemData(itemId, "tId"))) {
-            await scrapeFilmPage(itemId.slice(2))
-            filmId = itemId
-        }
-
-        tmdbIdType = await getItemData(filmId, "ty")
-        tmdbId = await getItemData(filmId, "tId")
-
-        if (!tmdbIdType || !tmdbId) return
-
-        const imageGrid = document.createElement("div")
-        imageGrid.id = "lcb-image-grid"
-        popup.appendChild(imageGrid)
-
-        const loadMoreButton = document.createElement("button")
-        loadMoreButton.id = "lcb-load-more"
-        loadMoreButton.textContent = "Load more"
-        loadMoreButton.onclick = () => loadMoreImages()
-        popup.appendChild(loadMoreButton)
-
-        async function getAllTmdbBackdrops(tmdbIdType, tmdbId) {
-            const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`)
-            const tmdbRes = await tmdbRawRes.json()
-
-            const nonLocaleImages = []
-            const localeImages = []
-
-            tmdbRes.backdrops?.forEach((image) => {
-                if (image.iso_639_1 === null) {
-                    nonLocaleImages.push(image.file_path)
-                } else {
-                    localeImages.push(image.file_path)
-                }
-            })
-
-            return [...nonLocaleImages, ...localeImages]
-        }
-
-        let allImageUrls = await getAllTmdbBackdrops(tmdbIdType, tmdbId)
-        let currentRow = 0
-        const rowsToLoad = 5
-
-        // Remove spinner and load images
-        await loadMoreImages()
-        spinner.remove()
-
-        async function loadMoreImages() {
-            const nextImages = allImageUrls.slice(currentRow * 3, (currentRow + rowsToLoad) * 3)
-            nextImages.forEach((file_path) => {
-                const imageItem = document.createElement("div")
-                imageItem.className = "lcb-image-item"
-
-                const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
-
-                const img = document.createElement("img")
-                img.src = imageUrl
-                imageItem.appendChild(img)
-
-                imageItem.onclick = () => {
-                    setItemData(itemId, "bu", imageUrl)
-                    closePopup(overlay)
-                }
-                imageGrid.appendChild(imageItem)
-            })
-
-            currentRow += rowsToLoad
-            if (currentRow * 3 >= allImageUrls.length) {
-                loadMoreButton.style.display = "none"
+        try {
+            // "Set as item backdrop" contextmenu
+            if (targetedFilmId && (await getItemData(targetedFilmId, "tId"))) {
+                filmId = targetedFilmId
+            } else if (targetedFilmId && !(await getItemData(targetedFilmId, "tId"))) {
+                await scrapeFilmPage(targetedFilmId.slice(2))
+                filmId = targetedFilmId
             }
+            // "Set film backdrop" contextmenu
+            else if (itemId.startsWith("f/") && (await getItemData(itemId, "tId"))) {
+                filmId = itemId
+            } else if (itemId.startsWith("f/") && !(await getItemData(itemId, "tId"))) {
+                await scrapeFilmPage(itemId.slice(2))
+                filmId = itemId
+            }
+
+            // Retrieve TMDB ID type and ID
+            tmdbIdType = await getItemData(filmId, "ty")
+            tmdbId = await getItemData(filmId, "tId")
+
+            if (!tmdbIdType || !tmdbId) {
+                console.error("TMDB ID or ID type is missing for filmId:", filmId) // Log missing ID error
+                return
+            }
+
+            const imageGrid = document.createElement("div")
+            imageGrid.id = "lcb-image-grid"
+            popup.appendChild(imageGrid)
+
+            const loadMoreButton = document.createElement("button")
+            loadMoreButton.id = "lcb-load-more"
+            loadMoreButton.textContent = "Load more"
+            loadMoreButton.onclick = () => loadMoreImages()
+            popup.appendChild(loadMoreButton)
+
+            async function getAllTmdbBackdrops(tmdbIdType, tmdbId) {
+                try {
+                    const tmdbRawRes = await fetch(
+                        `https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`
+                    )
+
+                    if (!tmdbRawRes.ok) {
+                        console.error(`Failed to fetch images from TMDB: ${tmdbRawRes.status} ${tmdbRawRes.statusText}`)
+                        return []
+                    }
+
+                    const tmdbRes = await tmdbRawRes.json()
+
+                    const nonLocaleImages = []
+                    const localeImages = []
+
+                    tmdbRes.backdrops?.forEach((image) => {
+                        if (image.iso_639_1 === null) {
+                            nonLocaleImages.push(image.file_path)
+                        } else {
+                            localeImages.push(image.file_path)
+                        }
+                    })
+
+                    return [...nonLocaleImages, ...localeImages]
+                } catch (error) {
+                    console.error("Error in getAllTmdbBackdrops:", error)
+                    return []
+                }
+            }
+
+            let allImageUrls = await getAllTmdbBackdrops(tmdbIdType, tmdbId)
+            let currentRow = 0
+            const rowsToLoad = 5
+
+            // Remove spinner and load images
+            await loadMoreImages()
+            spinner.remove()
+
+            async function loadMoreImages() {
+                const nextImages = allImageUrls.slice(currentRow * 3, (currentRow + rowsToLoad) * 3)
+                nextImages.forEach((file_path) => {
+                    const imageItem = document.createElement("div")
+                    imageItem.className = "lcb-image-item"
+
+                    const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
+
+                    const img = document.createElement("img")
+                    img.src = imageUrl
+                    imageItem.appendChild(img)
+
+                    imageItem.onclick = () => {
+                        setItemData(itemId, "bu", imageUrl).catch((err) => {
+                            console.error("Failed to set backdrop URL:", err)
+                        })
+                        closePopup(overlay)
+                    }
+                    imageGrid.appendChild(imageItem)
+                })
+
+                currentRow += rowsToLoad
+                if (currentRow * 3 >= allImageUrls.length) {
+                    loadMoreButton.style.display = "none"
+                }
+            }
+        } catch (error) {
+            // General error catch
+            console.error("An error occurred while setting up the image URL popup:", error)
         }
     }
 
     function showSettingsPopup() {
+        // Create overlay for the settings popup
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
         overlay.onclick = (e) => {
@@ -514,12 +620,14 @@
         const popup = document.createElement("div")
         popup.id = "lcb-settings-popup"
 
+        // Helper function to create label elements
         function createLabelElement(text) {
             const label = document.createElement("label")
             label.textContent = text
             popup.appendChild(label)
         }
 
+        // Helper function to create input elements
         function createInputElement(name, id, placeholder) {
             createLabelElement(name)
 
@@ -529,11 +637,14 @@
             input.placeholder = placeholder
             input.oninput = (e) => {
                 const value = e.target.value?.trim()
-                setConfigData(id, value)
+                setConfigData(id, value).catch((err) => {
+                    console.error(`Failed to set config data for ${id}:`, err) // Log error if setting data fails
+                })
             }
             popup.appendChild(input)
         }
 
+        // Helper function to create checkbox elements
         function createCheckboxElement(labelText, id) {
             const container = document.createElement("div")
             container.className = "lcb-checkbox-container"
@@ -541,7 +652,11 @@
             const checkbox = document.createElement("input")
             checkbox.type = "checkbox"
             checkbox.checked = getConfigData(id)
-            checkbox.onchange = (e) => setConfigData(id, e.target.checked)
+            checkbox.onchange = (e) => {
+                setConfigData(id, e.target.checked).catch((err) => {
+                    console.error(`Failed to set config data for ${id}:`, err) // Log error if setting data fails
+                })
+            }
             container.appendChild(checkbox)
 
             const label = document.createElement("label")
@@ -559,21 +674,26 @@
 
         // Export settings to a JSON file
         async function exportSettings() {
-            const settings = {
-                CONFIG: GM_getValue("CONFIG", {}),
-                ITEM_DATA: await getItemData(),
-            }
+            try {
+                const settings = {
+                    CONFIG: GM_getValue("CONFIG", {}),
+                    ITEM_DATA: await getItemData(),
+                }
 
-            // Create a data URL for the JSON file
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
-            const downloadAnchor = document.createElement("a")
-            downloadAnchor.setAttribute("href", dataStr)
-            downloadAnchor.setAttribute("download", "lcbSettings.json")
-            document.body.appendChild(downloadAnchor)
-            downloadAnchor.click()
-            document.body.removeChild(downloadAnchor)
+                // Create a data URL for the JSON file
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
+                const downloadAnchor = document.createElement("a")
+                downloadAnchor.setAttribute("href", dataStr)
+                downloadAnchor.setAttribute("download", "lcbSettings.json")
+                document.body.appendChild(downloadAnchor)
+                downloadAnchor.click()
+                document.body.removeChild(downloadAnchor)
+            } catch (error) {
+                console.error("Failed to export settings:", error) // Log error if export fails
+            }
         }
 
+        // Import settings from a JSON file
         function importSettings(event) {
             const file = event.target.files[0]
             if (!file) return
@@ -585,21 +705,28 @@
                     const settings = JSON.parse(content)
 
                     GM_setValue("CONFIG", settings.CONFIG || {})
-                    setItemData(settings.ITEM_DATA || {})
+                    setItemData(settings.ITEM_DATA || {}).catch((err) => {
+                        console.error("Failed to import item data:", err) // Log error if importing data fails
+                    })
 
                     // Refresh the popup to reflect imported settings
                     closePopup(overlay)
                     showSettingsPopup()
                 } catch (err) {
-                    console.error(err)
+                    console.error("Failed to import settings:", err) // Log error if JSON parsing fails
                     alert("Failed to import settings: Invalid JSON file.")
                 }
+            }
+            reader.onerror = (err) => {
+                console.error("Error reading import file:", err) // Log error if file reading fails
+                alert("Failed to read import file.")
             }
             reader.readAsText(file)
         }
 
+        // UI Elements
         createInputElement(
-            "Enter your TMDB API key to display missing film backdrops and get ability to select backdrops from UI:",
+            "Enter your TMDB API key to display missing film backdrops and get the ability to select backdrops from UI:",
             "TMDB_API_KEY",
             "TMDB API Key"
         )
@@ -701,14 +828,26 @@
     }
 
     async function getTmdbBackdrop(tmdbIdType, tmdbId) {
-        if (!getConfigData("TMDB_API_KEY")) return null
+        if (!getConfigData("TMDB_API_KEY")) {
+            console.error("TMDB API key is not configured.") // Log missing API key
+            return null
+        }
 
-        const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`)
-        const tmdbRes = await tmdbRawRes.json()
+        try {
+            const tmdbRawRes = await fetch(`https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`)
+            if (!tmdbRawRes.ok) {
+                console.error(`Failed to fetch TMDB backdrops: ${tmdbRawRes.statusText}`) // Log HTTP error
+                return null
+            }
 
-        const imageId = tmdbRes.backdrops?.[0]?.file_path
+            const tmdbRes = await tmdbRawRes.json()
+            const imageId = tmdbRes.backdrops?.[0]?.file_path
 
-        return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
+            return imageId ? `https://image.tmdb.org/t/p/original${imageId}` : null
+        } catch (error) {
+            console.error("Error fetching TMDB backdrop:", error) // General error catch
+            return null
+        }
     }
 
     async function isDefaultBackdropAvailable(dom) {
@@ -718,41 +857,55 @@
         } else {
             defaultBackdropElement = document.querySelector("#backdrop")
             if (!defaultBackdropElement) {
-                defaultBackdropElement = await waitForElement("#backdrop", 100)
+                try {
+                    defaultBackdropElement = await waitForElement("#backdrop", 100)
+                } catch (error) {
+                    console.error("Failed to find default backdrop element:", error) // Log element not found
+                    return false
+                }
             }
         }
+
         const defaultBackdropUrl =
             defaultBackdropElement?.dataset?.backdrop2x ||
             defaultBackdropElement?.dataset?.backdrop ||
             defaultBackdropElement?.dataset?.backdropMobile
 
-        if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) return defaultBackdropUrl
+        if (defaultBackdropUrl?.includes("https://a.ltrbxd.com/resized/sm/upload")) {
+            return defaultBackdropUrl
+        }
         return false
     }
 
     async function extractBackdropUrlFromLetterboxdFilmPage(filmId, dom, shouldScrape = true) {
-        const filmBackdropUrl = await isDefaultBackdropAvailable(dom)
+        try {
+            const filmBackdropUrl = await isDefaultBackdropAvailable(dom)
 
-        // get tmdb id
-        let tmdbElement
-        if (dom) {
-            tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
-        } else {
-            tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+            // Get TMDB ID and type
+            let tmdbElement
+            if (dom) {
+                tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
+            } else {
+                tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+            }
+
+            const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
+            const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
+
+            if (tmdbIdType && tmdbId) {
+                await setItemData(filmId, "ty", tmdbIdType)
+                await setItemData(filmId, "tId", tmdbId)
+            }
+
+            if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`) && shouldScrape) {
+                return await getTmdbBackdrop(tmdbIdType, tmdbId)
+            }
+
+            return filmBackdropUrl
+        } catch (error) {
+            console.error("Error extracting backdrop URL from Letterboxd film page:", error) // General error catch
+            return null
         }
-        const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
-        const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
-
-        if (tmdbIdType && tmdbId) {
-            await setItemData(filmId, "ty", tmdbIdType)
-            await setItemData(filmId, "tId", tmdbId)
-        }
-
-        if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`) && shouldScrape) {
-            return await getTmdbBackdrop(tmdbIdType, tmdbId)
-        }
-
-        return filmBackdropUrl
     }
 
     function scrapeFilmPage(filmName) {
@@ -761,14 +914,19 @@
                 method: "GET",
                 url: `https://letterboxd.com/film/${filmName}/`,
                 onload: async function (response) {
-                    const parser = new DOMParser()
-                    const dom = parser.parseFromString(response.responseText, "text/html")
+                    try {
+                        const parser = new DOMParser()
+                        const dom = parser.parseFromString(response.responseText, "text/html")
 
-                    // [url, isCached]
-                    resolve([await extractBackdropUrlFromLetterboxdFilmPage(`f/${filmName}`, dom), false])
+                        // Resolve with URL and cache status
+                        resolve([await extractBackdropUrlFromLetterboxdFilmPage(`f/${filmName}`, dom), false])
+                    } catch (error) {
+                        console.error("Error parsing or extracting backdrop from Letterboxd page:", error) // General error catch
+                        resolve([null, false])
+                    }
                 },
                 onerror: function (error) {
-                    console.error(`Can't scrape Letterboxd page: ${filmName}`, error)
+                    console.error(`Can't scrape Letterboxd page: ${filmName}`, error) // Log scraping error
                     resolve([null, false])
                 },
             })
@@ -776,326 +934,351 @@
     }
 
     async function scrapeFilmLinkElement(selector, shouldScrape, itemId) {
-        const firstPosterElement = await waitForElement(selector, 2000)
-        if (!firstPosterElement) return [null, false]
+        try {
+            const firstPosterElement = await waitForElement(selector, 2000)
+            if (!firstPosterElement) return [null, false]
 
-        const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
-        const filmId = `f/${filmName}`
+            const filmName = firstPosterElement.href?.match(/\/film\/([^\/]+)/)?.[1]
+            const filmId = `f/${filmName}`
 
-        if (!itemId.startsWith("f/")) await setItemData(itemId, "fId", filmId)
+            if (!itemId.startsWith("f/")) await setItemData(itemId, "fId", filmId)
 
-        const cacheBackdrop = await getItemData(filmId, "bu")
+            const cacheBackdrop = await getItemData(filmId, "bu")
 
-        if (cacheBackdrop) {
-            return [cacheBackdrop, true]
-        } else if (!shouldScrape) {
+            if (cacheBackdrop) {
+                return [cacheBackdrop, true]
+            } else if (!shouldScrape) {
+                return [null, false]
+            } else {
+                return await scrapeFilmPage(filmName)
+            }
+        } catch (error) {
+            console.error("Error scraping film link element:", error) // General error catch
             return [null, false]
-        } else {
-            return await scrapeFilmPage(filmName)
         }
     }
 
     function injectBackdrop(header, backdropUrl, attributes = []) {
-        // get or inject backdrop containers
-        const backdropContainer =
-            // for patron users who already have an backdrop
-            document.querySelector(".backdrop-container") ||
-            // for non-patron users
-            Object.assign(document.createElement("div"), { className: "backdrop-container" })
+        try {
+            // Get or inject backdrop containers
+            const backdropContainer =
+                // For patron users who already have a backdrop
+                document.querySelector(".backdrop-container") ||
+                // For non-patron users
+                Object.assign(document.createElement("div"), { className: "backdrop-container" })
 
-        // inject necessary classes
-        document.body.classList.add("backdropped", "backdrop-loaded", ...attributes)
-        document.getElementById("content")?.classList.add("-backdrop")
+            // Inject necessary classes
+            document.body.classList.add("backdropped", "backdrop-loaded", ...attributes)
+            document.getElementById("content")?.classList.add("-backdrop")
 
-        // make sure to inject .-backdrop to #content if its missed before
-        const intervalId = setInterval(() => document.getElementById("content")?.classList.add("-backdrop"), 100)
-        setTimeout(() => clearInterval(intervalId), 5000)
+            // Ensure .-backdrop is added to #content if missed before
+            const intervalId = setInterval(() => document.getElementById("content")?.classList.add("-backdrop"), 100)
+            setTimeout(() => clearInterval(intervalId), 5000)
 
-        // inject backdrop child
-        backdropContainer.innerHTML = `
+            // Inject backdrop child
+            backdropContainer.innerHTML = `
                 <div id="backdrop" class="backdrop-wrapper -loaded" data-backdrop="${backdropUrl}" data-backdrop2x="${backdropUrl}" data-backdrop-mobile="${backdropUrl}" data-offset="0">
                     <div class="backdropimage js-backdrop-image" style="background-image: url(${backdropUrl}); background-position: center 0px;"></div>
                     <div class="backdropmask js-backdrop-fade"></div>
                 </div>`
 
-        header.before(backdropContainer)
+            header.before(backdropContainer)
+        } catch (error) {
+            console.error("Error injecting backdrop:", error) // General error catch
+        }
     }
 
     async function injectContextMenuToAllFilmPosterItems({ itemId, name } = {}) {
         function addFilmOption({ menu, className, name, onClick = () => {}, itemId = undefined } = {}) {
-            if (menu.querySelector(`.${className}`)) return
+            try {
+                if (menu.querySelector(`.${className}`)) return
 
-            const activityLink = menu.querySelector(".fm-show-activity a")
-            const filmName = activityLink.href.match(/\/film\/([^\/]+)/)?.[1]
+                const activityLink = menu.querySelector(".fm-show-activity a")
+                const filmName = activityLink.href.match(/\/film\/([^\/]+)/)?.[1]
 
-            const backdropItem = document.createElement("li")
-            backdropItem.classList.add(className, "popmenu-textitem", "-centered")
+                const backdropItem = document.createElement("li")
+                backdropItem.classList.add(className, "popmenu-textitem", "-centered")
 
-            const backdropLink = document.createElement("a")
-            backdropLink.style.cursor = "pointer"
-            backdropLink.textContent = name
-            backdropItem.onclick = () => {
-                menu.setAttribute("hidden", "")
-                onClick(filmName, itemId)
+                const backdropLink = document.createElement("a")
+                backdropLink.style.cursor = "pointer"
+                backdropLink.textContent = name
+                backdropItem.onclick = () => {
+                    menu.setAttribute("hidden", "")
+                    onClick(filmName, itemId)
+                }
+
+                backdropItem.appendChild(backdropLink)
+
+                const activityItem = menu.querySelector(".fm-show-activity")
+                activityItem.parentNode.insertBefore(backdropItem, activityItem)
+            } catch (error) {
+                console.error("Error adding film option to context menu:", error) // General error catch
             }
-
-            backdropItem.appendChild(backdropLink)
-
-            const activityItem = menu.querySelector(".fm-show-activity")
-            activityItem.parentNode.insertBefore(backdropItem, activityItem)
         }
 
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === "childList") {
-                    mutation.addedNodes.forEach((node) => {
-                        if (
-                            node.nodeType === Node.ELEMENT_NODE &&
-                            node.matches(`body > .popmenu.film-poster-popmenu:has(>ul >li >a[href*="/film/"])`)
-                        ) {
-                            if (itemId) {
+        try {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === "childList") {
+                        mutation.addedNodes.forEach((node) => {
+                            if (
+                                node.nodeType === Node.ELEMENT_NODE &&
+                                node.matches(`body > .popmenu.film-poster-popmenu:has(>ul >li >a[href*="/film/"])`)
+                            ) {
+                                if (itemId) {
+                                    addFilmOption({
+                                        menu: node,
+                                        className: "fm-set-as-backdrop",
+                                        name: `Set as ${name} backdrop`,
+                                        onClick: (filmName, itemId) => showImageUrlPopup({ itemId: itemId, targetedFilmId: `f/${filmName}` }),
+                                        itemId: itemId,
+                                    })
+                                }
                                 addFilmOption({
                                     menu: node,
-                                    className: "fm-set-as-backdrop",
-                                    name: `Set as ${name} backdrop`,
-                                    onClick: (filmName, itemId) => showImageUrlPopup({ itemId: itemId, targetedFilmId: `f/${filmName}` }),
-                                    itemId: itemId,
+                                    className: "fm-set-film-backdrop",
+                                    name: "Set film backdrop",
+                                    onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
                                 })
                             }
-                            addFilmOption({
-                                menu: node,
-                                className: "fm-set-film-backdrop",
-                                name: "Set film backdrop",
-                                onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
-                            })
-                        }
-                    })
-                }
+                        })
+                    }
+                })
             })
-        })
 
-        await waitForElement("body")
-        observer.observe(document.body, { childList: true })
+            await waitForElement("body")
+            observer.observe(document.body, { childList: true })
+        } catch (error) {
+            console.error("Error injecting context menu to all film poster items:", error) // General error catch
+        }
     }
 
     async function filmPageInjector() {
-        const filmId = `f/${location.pathname.split("/")?.[2]}`
+        try {
+            const filmId = `f/${location.pathname.split("/")?.[2]}`
 
-        const header = await waitForElement("#header")
-        injectContextMenuToAllFilmPosterItems()
+            const header = await waitForElement("#header")
+            injectContextMenuToAllFilmPosterItems()
 
-        const cacheBackdrop = await getItemData(filmId, "bu")
+            const cacheBackdrop = await getItemData(filmId, "bu")
 
-        async function scrapeTmdbIdAndType() {
-            // extracts tmdb id and type
-            const tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
-            const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
-            const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
+            async function scrapeTmdbIdAndType() {
+                try {
+                    // Extracts TMDB ID and type
+                    const tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+                    const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
+                    const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
-            if (tmdbIdType && tmdbId) {
-                await setItemData(filmId, "ty", tmdbIdType)
-                await setItemData(filmId, "tId", tmdbId)
+                    if (tmdbIdType && tmdbId) {
+                        await setItemData(filmId, "ty", tmdbIdType)
+                        await setItemData(filmId, "tId", tmdbId)
+                    }
+                } catch (error) {
+                    console.error("Error scraping TMDB ID and type:", error) // General error catch
+                }
             }
-        }
 
-        if (cacheBackdrop) {
-            // inject backdrop
-            injectBackdrop(header, cacheBackdrop, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            scrapeTmdbIdAndType()
-            return
-        }
-
-        // if original backdrop is available then return
-        if (await isDefaultBackdropAvailable()) {
-            scrapeTmdbIdAndType()
-            return
-        }
-
-        if (getConfigData("TMDB_API_KEY") && getConfigData("FILM_DISPLAY_MISSING_BACKDROP")) {
-            const backdropUrl = await extractBackdropUrlFromLetterboxdFilmPage(filmId)
-
-            // inject backdrop
-            if (backdropUrl) {
-                injectBackdrop(header, backdropUrl, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-
-                setItemData(filmId, "bu", backdropUrl)
+            if (cacheBackdrop) {
+                // Inject backdrop
+                injectBackdrop(header, cacheBackdrop, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                scrapeTmdbIdAndType()
+                return
             }
-        } else {
-            extractBackdropUrlFromLetterboxdFilmPage(filmId, undefined, false)
+
+            // If original backdrop is available then return
+            if (await isDefaultBackdropAvailable()) {
+                scrapeTmdbIdAndType()
+                return
+            }
+
+            if (getConfigData("TMDB_API_KEY") && getConfigData("FILM_DISPLAY_MISSING_BACKDROP")) {
+                const backdropUrl = await extractBackdropUrlFromLetterboxdFilmPage(filmId)
+
+                // Inject backdrop
+                if (backdropUrl) {
+                    injectBackdrop(header, backdropUrl, getConfigData("FILM_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                    await setItemData(filmId, "bu", backdropUrl)
+                }
+            } else {
+                await extractBackdropUrlFromLetterboxdFilmPage(filmId, undefined, false)
+            }
+        } catch (error) {
+            console.error("Error in film page injector:", error) // General error catch
         }
     }
 
     async function userPageInjector() {
-        const userName = location.pathname.split("/")?.[1]?.toLowerCase()
-        const userId = `u/${userName}`
+        try {
+            const userName = location.pathname.split("/")?.[1]?.toLowerCase()
+            const userId = `u/${userName}`
+            const filmElementSelector = "#favourites .poster-list > li:first-child a"
 
-        const filmElementSelector = "#favourites .poster-list > li:first-child a"
+            if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && userName !== loggedInAs) return
 
-        if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && userName !== loggedInAs) return
+            const cacheBackdrop = await getItemData(userId, "bu")
+            const header = await waitForElement("#header")
+            injectContextMenuToAllFilmPosterItems({ itemId: userId, name: "user" })
 
-        const cacheBackdrop = await getItemData(userId, "bu")
+            if (cacheBackdrop) {
+                injectBackdrop(header, cacheBackdrop, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                await scrapeFilmLinkElement(filmElementSelector, false, userId)
+                return
+            }
 
-        const header = await waitForElement("#header")
-        injectContextMenuToAllFilmPosterItems({ itemId: userId, name: "user" })
+            if (await isDefaultBackdropAvailable()) {
+                await scrapeFilmLinkElement(filmElementSelector, false, userId)
+                return
+            }
 
-        if (cacheBackdrop) {
-            // inject backdrop
-            injectBackdrop(header, cacheBackdrop, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            scrapeFilmLinkElement(filmElementSelector, false, userId)
-            return
-        }
+            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("USER_AUTO_SCRAPE"), userId)
 
-        // if original backdrop is available then return
-        if (await isDefaultBackdropAvailable()) {
-            scrapeFilmLinkElement(filmElementSelector, false, userId)
-            return
-        }
+            if (scrapedImage) {
+                injectBackdrop(header, scrapedImage, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
-        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("USER_AUTO_SCRAPE"), userId)
-
-        // inject backdrop
-        if (scrapedImage) {
-            injectBackdrop(header, scrapedImage, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-
-            if (isCached) return
-
-            setItemData(userId, "bu", scrapedImage)
+                if (!isCached) {
+                    await setItemData(userId, "bu", scrapedImage)
+                }
+            }
+        } catch (error) {
+            console.error("Error in userPageInjector:", error)
         }
     }
 
     async function listPageInjector() {
-        const listId = `l/${location.pathname.split("/")?.[1]?.toLowerCase()}/${location.pathname.split("/")?.[3]}`
+        try {
+            const listId = `l/${location.pathname.split("/")?.[1]?.toLowerCase()}/${location.pathname.split("/")?.[3]}`
+            const filmElementSelector = ".poster-list > li:first-child a"
 
-        const filmElementSelector = ".poster-list > li:first-child a"
+            const cacheBackdrop = await getItemData(listId, "bu")
+            const header = await waitForElement("#header")
+            injectContextMenuToAllFilmPosterItems({ itemId: listId, name: "list" })
 
-        const cacheBackdrop = await getItemData(listId, "bu")
+            if (!getConfigData("LIST_SHORT_BACKDROP")) {
+                document.body.classList.remove("shortbackdropped", "-crop")
+            }
 
-        const header = await waitForElement("#header")
-        injectContextMenuToAllFilmPosterItems({ itemId: listId, name: "list" })
+            if (cacheBackdrop) {
+                injectBackdrop(header, cacheBackdrop, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                await scrapeFilmLinkElement(filmElementSelector, false, listId)
+                return
+            }
 
-        // remove short backdrop classnames for non custom backrop list pages
-        if (!getConfigData("LIST_SHORT_BACKDROP")) document.body.classList.remove("shortbackdropped", "-crop")
+            if (await isDefaultBackdropAvailable()) {
+                await scrapeFilmLinkElement(filmElementSelector, false, listId)
+                return
+            }
 
-        if (cacheBackdrop) {
-            // inject backdrop
-            injectBackdrop(header, cacheBackdrop, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            scrapeFilmLinkElement(filmElementSelector, false, listId)
-            return
-        }
+            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("LIST_AUTO_SCRAPE"), listId)
 
-        // if original backdrop is available then return
-        if (await isDefaultBackdropAvailable()) {
-            scrapeFilmLinkElement(filmElementSelector, false, listId)
-            return
-        }
+            if (scrapedImage) {
+                injectBackdrop(header, scrapedImage, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
-        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("LIST_AUTO_SCRAPE"), listId)
-
-        // inject backdrop
-        if (scrapedImage) {
-            injectBackdrop(header, scrapedImage, getConfigData("LIST_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-
-            if (isCached) return
-
-            setItemData(listId, "bu", scrapedImage)
+                if (!isCached) {
+                    await setItemData(listId, "bu", scrapedImage)
+                }
+            }
+        } catch (error) {
+            console.error("Error in listPageInjector:", error)
         }
     }
 
     async function personPageInjector() {
-        const personId = `p/${location.pathname.split("/")?.[2]}`
+        try {
+            const personId = `p/${location.pathname.split("/")?.[2]}`
+            const filmElementSelector = ".grid > li:first-child a"
 
-        const filmElementSelector = ".grid > li:first-child a"
+            const cacheBackdrop = await getItemData(personId, "bu")
+            const header = await waitForElement("#header")
+            injectContextMenuToAllFilmPosterItems({ itemId: personId, name: "person" })
 
-        const cacheBackdrop = await getItemData(personId, "bu")
+            if (cacheBackdrop) {
+                injectBackdrop(header, cacheBackdrop, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                await scrapeFilmLinkElement(filmElementSelector, false, personId)
+                return
+            }
 
-        const header = await waitForElement("#header")
-        injectContextMenuToAllFilmPosterItems({ itemId: personId, name: "person" })
+            if (await isDefaultBackdropAvailable()) {
+                await scrapeFilmLinkElement(filmElementSelector, false, personId)
+                return
+            }
 
-        if (cacheBackdrop) {
-            // inject backdrop
-            injectBackdrop(header, cacheBackdrop, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            scrapeFilmLinkElement(filmElementSelector, false, personId)
-            return
-        }
+            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("PERSON_AUTO_SCRAPE"), personId)
 
-        // if original backdrop is available then return
-        if (await isDefaultBackdropAvailable()) {
-            scrapeFilmLinkElement(filmElementSelector, false, personId)
-            return
-        }
+            if (scrapedImage) {
+                injectBackdrop(header, scrapedImage, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
-        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("PERSON_AUTO_SCRAPE"), personId)
-
-        // inject backdrop
-        if (scrapedImage) {
-            injectBackdrop(header, scrapedImage, getConfigData("PERSON_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-
-            if (isCached) return
-
-            setItemData(personId, "bu", scrapedImage)
+                if (!isCached) {
+                    await setItemData(personId, "bu", scrapedImage)
+                }
+            }
+        } catch (error) {
+            console.error("Error in personPageInjector:", error)
         }
     }
 
     async function reviewPageInjector() {
-        const filmName = location.pathname.match(/\/film\/([^\/]+)/)?.[1]
-        const filmId = `f/${filmName}`
+        try {
+            const filmName = location.pathname.match(/\/film\/([^\/]+)/)?.[1]
+            const filmId = `f/${filmName}`
+            const filmElementSelector = `.film-poster a[href^="/film/"]`
 
-        const filmElementSelector = `.film-poster a[href^="/film/"]`
+            const cacheBackdrop = await getItemData(filmId, "bu")
+            const header = await waitForElement("#header")
+            injectContextMenuToAllFilmPosterItems()
 
-        const cacheBackdrop = await getItemData(filmId, "bu")
+            if (cacheBackdrop) {
+                injectBackdrop(header, cacheBackdrop, getConfigData("REVIEW_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
+                return
+            }
 
-        const header = await waitForElement("#header")
-        injectContextMenuToAllFilmPosterItems()
+            if (await isDefaultBackdropAvailable()) return
 
-        if (cacheBackdrop) {
-            // inject backdrop
-            injectBackdrop(header, cacheBackdrop, getConfigData("REVIEW_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
-            return
-        }
+            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("REVIEW_AUTO_SCRAPE"), filmId)
 
-        // if original backdrop is available then return
-        if (await isDefaultBackdropAvailable()) return
+            if (scrapedImage) {
+                injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
 
-        const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("REVIEW_AUTO_SCRAPE"), filmId)
-
-        // inject backdrop
-        if (scrapedImage) {
-            injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
-
-            if (isCached) return
-
-            setItemData(filmId, "bu", scrapedImage)
+                if (!isCached) {
+                    await setItemData(filmId, "bu", scrapedImage)
+                }
+            }
+        } catch (error) {
+            console.error("Error in reviewPageInjector:", error)
         }
     }
 
     // MAIN
 
-    const currentURL = location.protocol + "//" + location.hostname + location.pathname
+    try {
+        const currentURL = location.protocol + "//" + location.hostname + location.pathname
 
-    const filmPageRegex = /^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/
-    const userPageRegex = /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/
-    const listPageRegex =
-        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/
-    const personPageRegex =
-        /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
-    const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
+        const filmPageRegex = /^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/
+        const userPageRegex = /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/
+        const listPageRegex =
+            /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/
+        const personPageRegex =
+            /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
+        const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
 
-    if (filmPageRegex.test(currentURL)) {
-        filmPageInjector()
-    } else if (
-        userPageRegex.test(currentURL) &&
-        !["/settings/", "/films/", "/lists/", "/members/", "/journal/", "/sign-in/", "/create-account/", "/pro/"].some((ending) =>
-            currentURL.toLowerCase().endsWith(ending)
-        )
-    ) {
-        userPageInjector()
-    } else if (listPageRegex.test(currentURL)) {
-        listPageInjector()
-    } else if (personPageRegex.test(currentURL)) {
-        personPageInjector()
-    } else if (reviewPageRegex.test(currentURL)) {
-        reviewPageInjector()
-    } else {
-        injectContextMenuToAllFilmPosterItems({ itemId: `u/${loggedInAs}`, name: "user" })
+        if (filmPageRegex.test(currentURL)) {
+            filmPageInjector()
+        } else if (
+            userPageRegex.test(currentURL) &&
+            !["/settings/", "/films/", "/lists/", "/members/", "/journal/", "/sign-in/", "/create-account/", "/pro/"].some((ending) =>
+                currentURL.toLowerCase().endsWith(ending)
+            )
+        ) {
+            userPageInjector()
+        } else if (listPageRegex.test(currentURL)) {
+            listPageInjector()
+        } else if (personPageRegex.test(currentURL)) {
+            personPageInjector()
+        } else if (reviewPageRegex.test(currentURL)) {
+            reviewPageInjector()
+        } else {
+            injectContextMenuToAllFilmPosterItems({ itemId: `u/${loggedInAs}`, name: "user" })
+        }
+    } catch (error) {
+        console.error("Error in main function:", error)
     }
 })()
