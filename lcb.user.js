@@ -317,6 +317,7 @@
             justify-content: center;
             align-items: center;
             z-index: 10000;
+            overflow: hidden;
         }
         #lcb-settings-popup {
             background-color: #20242c;
@@ -336,9 +337,13 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            -webkit-overflow-scrolling: touch;
         }
         #lcb-settings-popup[type="burlpopup"] {
             width: 80%;
+        }
+        body.lcb-no-scroll {
+            overflow: hidden;
         }
         #lcb-settings-popup label {
             color: #cfcfcf;
@@ -453,6 +458,9 @@
         `)
 
     async function showImageUrlPopup({ itemId, targetedFilmId, filmElementSelector } = {}) {
+        // Add the no-scroll class to the body
+        document.body.classList.add("lcb-no-scroll")
+
         // Create overlay for the popup
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
@@ -499,6 +507,8 @@
 
         function closePopup(overlay) {
             document.body.removeChild(overlay)
+            // Remove the no-scroll class from the body
+            document.body.classList.remove("lcb-no-scroll")
         }
 
         // Exit if TMDB API key is not configured
@@ -636,6 +646,9 @@
     }
 
     function showSettingsPopup() {
+        // Add the no-scroll class to the body
+        document.body.classList.add("lcb-no-scroll")
+
         // Create overlay for the settings popup
         const overlay = document.createElement("div")
         overlay.id = "lcb-settings-overlay"
@@ -811,6 +824,8 @@
 
         function closePopup(overlay) {
             document.body.removeChild(overlay)
+            // Remove the no-scroll class from the body
+            document.body.classList.remove("lcb-no-scroll")
         }
     }
 
