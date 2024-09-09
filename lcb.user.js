@@ -1030,6 +1030,8 @@
     }
 
     async function injectContextMenuToAllFilmPosterItems({ itemId, name } = {}) {
+        if (isMobile) return
+
         function addFilmOption({ menu, className, name, onClick = () => {}, itemId = undefined } = {}) {
             try {
                 if (menu.querySelector(`.${className}`)) return
