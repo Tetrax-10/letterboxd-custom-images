@@ -622,7 +622,7 @@
                     const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
 
                     const img = document.createElement("img")
-                    img.src = imageUrl
+                    img.src = imageUrl.replace("original", "w500_and_h282_face")
                     imageItem.appendChild(img)
 
                     imageItem.onclick = () => {
