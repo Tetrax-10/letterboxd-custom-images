@@ -26,6 +26,8 @@
     // Register menu command to open settings popup
     GM_registerMenuCommand("Settings", showSettingsPopup)
 
+    let currentPage = null
+
     // Retrieve logged-in username from cookies
     const loggedInAs =
         document.cookie
@@ -457,7 +459,16 @@
         }
         `)
 
+    async function updateBackdrop(backdropUrl) {
+        if (currentPage === "other") return
+
+        const header = await waitForElement("#header")
+        injectBackdrop(header, backdropUrl, getConfigData(`${currentPage.toUpperCase()}_SHORT_BACKDROP`) ? ["shortbackdropped", "-crop"] : [])
+    }
+
     async function showImageUrlPopup({ itemId, targetedFilmId, filmElementSelector } = {}) {
+        let hasInputValueChanged = false
+
         // Add the no-scroll class to the body
         document.body.classList.add("lcb-no-scroll")
 
@@ -489,11 +500,8 @@
         }
         input.placeholder = "Backdrop Image URL"
         input.autofocus = true
-        input.oninput = (e) => {
-            const value = e.target.value?.trim() ?? ""
-            setItemData(itemId, "bu", value).catch((err) => {
-                console.error("Failed to set backdrop URL:", err) // Log error if setting data fails
-            })
+        input.oninput = () => {
+            hasInputValueChanged = true
         }
         popup.appendChild(input)
 
@@ -506,6 +514,14 @@
         }, 100)
 
         function closePopup(overlay) {
+            if (hasInputValueChanged) {
+                const backdropUrl = document.querySelector(`input[placeholder="Backdrop Image URL"]`)?.value?.trim() || ""
+                if (backdropUrl) updateBackdrop(backdropUrl)
+                setItemData(itemId, "bu", backdropUrl).catch((err) => {
+                    console.error("Failed to set backdrop URL:", err)
+                })
+            }
+
             document.body.removeChild(overlay)
             // Remove the no-scroll class from the body
             document.body.classList.remove("lcb-no-scroll")
@@ -619,14 +635,16 @@
                     const imageItem = document.createElement("div")
                     imageItem.className = "lcb-image-item"
 
-                    const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
+                    const backdropUrl = `https://image.tmdb.org/t/p/original${file_path}`
 
                     const img = document.createElement("img")
-                    img.src = imageUrl.replace("original", "w500_and_h282_face")
+                    img.src = backdropUrl.replace("original", "w500_and_h282_face")
                     imageItem.appendChild(img)
 
                     imageItem.onclick = () => {
-                        setItemData(itemId, "bu", imageUrl).catch((err) => {
+                        hasInputValueChanged = false
+                        updateBackdrop(backdropUrl)
+                        setItemData(itemId, "bu", backdropUrl).catch((err) => {
                             console.error("Failed to set backdrop URL:", err)
                         })
                         closePopup(overlay)
@@ -1392,6 +1410,7 @@
         const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
 
         if (filmPageRegex.test(currentURL)) {
+            currentPage = "film"
             filmPageInjector()
         } else if (
             userPageRegex.test(currentURL) &&
@@ -1399,14 +1418,19 @@
                 currentURL.toLowerCase().endsWith(ending)
             )
         ) {
+            currentPage = "user"
             userPageInjector()
         } else if (listPageRegex.test(currentURL)) {
+            currentPage = "list"
             listPageInjector()
         } else if (personPageRegex.test(currentURL)) {
+            currentPage = "person"
             personPageInjector()
         } else if (reviewPageRegex.test(currentURL)) {
+            currentPage = "review"
             reviewPageInjector()
         } else {
+            currentPage = "other"
             injectContextMenuToAllFilmPosterItems({ itemId: `u/${loggedInAs}`, name: "user" })
         }
     } catch (error) {
