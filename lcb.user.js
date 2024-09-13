@@ -1414,9 +1414,19 @@
             filmPageInjector()
         } else if (
             userPageRegex.test(currentURL) &&
-            !["/settings/", "/films/", "/lists/", "/members/", "/journal/", "/sign-in/", "/create-account/", "/pro/"].some((ending) =>
-                currentURL.toLowerCase().endsWith(ending)
-            )
+            ![
+                "/settings/",
+                "/films/",
+                "/lists/",
+                "/members/",
+                "/journal/",
+                "/sign-in/",
+                "/create-account/",
+                "/pro/",
+                "/search/",
+                "/activity/",
+                "/countries/",
+            ].some((ending) => currentURL.toLowerCase().endsWith(ending))
         ) {
             currentPage = "user"
             userPageInjector()
