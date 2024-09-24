@@ -1,17 +1,17 @@
 // ==UserScript==
-// @name         Letterboxd Custom Backdrops
-// @description  Adds a custom backdrop to your profile, list and film pages that don’t have one
+// @name         Letterboxd Custom Images
+// @description  Customize letterboxd posters and backdrops without letterboxd PATRON
 // @author       Tetrax-10
-// @namespace    https://github.com/Tetrax-10/letterboxd-custom-backdrops
+// @namespace    https://github.com/Tetrax-10/letterboxd-custom-images
 // @version      3.7
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
-// @homepageURL  https://github.com/Tetrax-10/letterboxd-custom-backdrops
-// @supportURL   https://github.com/Tetrax-10/letterboxd-custom-backdrops/issues
-// @updateURL    https://tetrax-10.github.io/letterboxd-custom-backdrops/lcb.user.js
-// @downloadURL  https://tetrax-10.github.io/letterboxd-custom-backdrops/lcb.user.js
-// @icon         https://tetrax-10.github.io/letterboxd-custom-backdrops/assets/icon.png
+// @homepageURL  https://github.com/Tetrax-10/letterboxd-custom-images
+// @supportURL   https://github.com/Tetrax-10/letterboxd-custom-images/issues
+// @updateURL    https://tetrax-10.github.io/letterboxd-custom-images/lci.user.js
+// @downloadURL  https://tetrax-10.github.io/letterboxd-custom-images/lci.user.js
+// @icon         https://tetrax-10.github.io/letterboxd-custom-images/assets/icon.png
 // @run-at       document-start
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
@@ -213,6 +213,7 @@
 
                     // Handle specific data transformations based on dataType
                     switch (dataType) {
+                        case "pu":
                         case "bu":
                             if (value.startsWith("t/")) {
                                 value = `https://image.tmdb.org/t/p/original/${value.slice(2)}.jpg`
@@ -270,6 +271,7 @@
                         delete data[dataType]
                     } else {
                         switch (dataType) {
+                            case "pu":
                             case "bu":
                                 if (value.startsWith("https://image.tmdb.org/t/p/original")) {
                                     const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
@@ -308,7 +310,7 @@
     }
 
     GM_addStyle(`
-        #lcb-settings-overlay {
+        #lci-settings-overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -321,7 +323,7 @@
             z-index: 10000;
             overflow: hidden;
         }
-        #lcb-settings-popup {
+        #lci-settings-popup {
             background-color: #20242c;
             padding: 20px;
             border-radius: 8px;
@@ -341,19 +343,19 @@
             flex-direction: column;
             -webkit-overflow-scrolling: touch;
         }
-        #lcb-settings-popup[type="burlpopup"] {
+        #lci-settings-popup[type="imageurlpopup"] {
             width: 80%;
         }
-        body.lcb-no-scroll {
+        body.lci-no-scroll {
             overflow: hidden;
         }
-        #lcb-settings-popup label {
+        #lci-settings-popup label {
             color: #cfcfcf;
             font-weight: bold;
             font-size: 1.2em;
             margin-bottom: 10px;
         }
-        #lcb-settings-popup input {
+        #lci-settings-popup input {
             background-color: #20242c;
             border: 1px solid #cfcfcf;
             color: #cfcfcf;
@@ -361,7 +363,7 @@
             border-radius: 8px;
             margin-bottom: 10px;
         }
-        #lcb-settings-popup button {
+        #lci-settings-popup button {
             background-color: #4caf50;
             color: white;
             padding: 10px;
@@ -371,16 +373,16 @@
             font-size: 16px;
             margin-bottom: 10px;
         }
-        #lcb-settings-popup .import-export-container {
+        #lci-settings-popup .import-export-container {
             display: flex;
             justify-content: space-between;
             margin-top: 20px;
         }
-        .lcb-checkbox-container {
+        .lci-checkbox-container {
             display: flex;
             align-items: center;
         }
-        .lcb-checkbox-container input[type="checkbox"] {
+        .lci-checkbox-container input[type="checkbox"] {
             appearance: none;
             background-color: #20242c;
             border: 1px solid #cfcfcf;
@@ -392,11 +394,11 @@
             margin-right: 10px;
             outline: none;
         }
-        .lcb-checkbox-container input[type="checkbox"]:checked {
+        .lci-checkbox-container input[type="checkbox"]:checked {
             background-color: #4caf50;
             border: none;
         }
-        .lcb-checkbox-container input[type="checkbox"]:checked::after {
+        .lci-checkbox-container input[type="checkbox"]:checked::after {
             content: '\\2714'; /* Unicode checkmark */
             color: white;
             font-size: 1em;
@@ -405,18 +407,21 @@
             left: 50%;
             transform: translate(-50%, -50%);
         }
-        .lcb-checkbox-container label {
+        .lci-checkbox-container label {
             color: #cfcfcf;
             font-weight: bold;
             font-size: 1.2em;
         }
-        #lcb-image-grid {
+        #lci-image-grid {
             display: grid;
             grid-template-columns: repeat(${isMobile ? "1" : "3"}, 1fr);
             gap: 15px;
             margin-top: 20px;
         }
-        .lcb-image-item {
+        #lci-image-grid.lci-poster-grid {
+            grid-template-columns: repeat(${isMobile ? "2" : "5"}, 1fr);
+        }
+        .lci-image-item {
             cursor: pointer;
             border-radius: 8px;
             overflow: hidden;
@@ -424,15 +429,15 @@
             transition: border-color 0.3s;
             position: relative;
         }
-        .lcb-image-item img {
+        .lci-image-item img {
             width: 100%;
             height: auto;
             display: block;
         }
-        .lcb-image-item:hover {
+        .lci-image-item:hover {
             border-color: #4caf50;
         }
-        #lcb-load-more {
+        #lci-load-more {
             background-color: #4caf50;
             color: white;
             padding: 10px;
@@ -443,7 +448,7 @@
             margin-top: 20px;
             align-self: center;
         }
-        #lcb-loading-spinner {
+        #lci-loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             border-top: 4px solid #4caf50;
@@ -459,47 +464,42 @@
         }
         `)
 
-    async function updateBackdrop(backdropUrl) {
-        if (currentPage === "other") return
-
-        const header = await waitForElement("#header")
-        injectBackdrop(header, backdropUrl, getConfigData(`${currentPage.toUpperCase()}_SHORT_BACKDROP`) ? ["shortbackdropped", "-crop"] : [])
-    }
-
-    async function showImageUrlPopup({ itemId, targetedFilmId, filmElementSelector } = {}) {
+    async function showImageUrlPopup({ itemId, targetedFilmId, filmElementSelector, mode = "backdrop" } = {}) {
+        const modeName = mode === "poster" ? "Poster" : "Backdrop"
+        const imageUrlKey = mode === "poster" ? "pu" : "bu"
         let hasInputValueChanged = false
 
         // Add the no-scroll class to the body
-        document.body.classList.add("lcb-no-scroll")
+        document.body.classList.add("lci-no-scroll")
 
         // Create overlay for the popup
         const overlay = document.createElement("div")
-        overlay.id = "lcb-settings-overlay"
+        overlay.id = "lci-settings-overlay"
         overlay.onclick = (e) => {
             if (e.target === overlay) closePopup(overlay)
         }
 
         // Create popup container
         const popup = document.createElement("div")
-        popup.id = "lcb-settings-popup"
-        popup.setAttribute("type", "burlpopup")
+        popup.id = "lci-settings-popup"
+        popup.setAttribute("type", "imageurlpopup")
 
         // Add label for the input field
         const label = document.createElement("label")
-        label.textContent = "Enter Backdrop Image URL:"
+        label.textContent = `Enter ${modeName} Image URL:`
         popup.appendChild(label)
 
         // Create input field for the URL
         const input = document.createElement("input")
         input.type = "text"
         try {
-            input.value = await getItemData(itemId, "bu") // Retrieve existing backdrop URL
+            input.value = await getItemData(itemId, imageUrlKey) // Retrieve existing image URL
         } catch (error) {
-            console.error("Failed to retrieve backdrop URL:", error) // Log error if retrieval fails
+            console.error(`Failed to retrieve ${modeName} URL:`, error) // Log error if retrieval fails
             input.value = ""
         }
-        input.placeholder = "Backdrop Image URL"
-        input.autofocus = true
+        input.placeholder = `${modeName} Image URL`
+        if (!isMobile) input.autofocus = true
         input.oninput = () => {
             hasInputValueChanged = true
         }
@@ -510,21 +510,32 @@
 
         // Focus on the input field after a short delay
         setTimeout(() => {
-            input.focus()
+            if (!isMobile) input.focus()
         }, 100)
+
+        async function updateImage(imageUrl, mode) {
+            if (mode === "poster") {
+                document.querySelectorAll(`.film-poster[data-film-link*="film/${itemId.slice(2)}"] .image`).forEach((posterImageElement) => {
+                    injectPoster(posterImageElement, imageUrl)
+                })
+            } else if (mode === "backdrop" && currentPage !== "other") {
+                const header = await waitForElement("#header")
+                injectBackdrop(header, imageUrl, getConfigData(`${currentPage.toUpperCase()}_SHORT_BACKDROP`) ? ["shortbackdropped", "-crop"] : [])
+            }
+        }
 
         function closePopup(overlay) {
             if (hasInputValueChanged) {
-                const backdropUrl = document.querySelector(`input[placeholder="Backdrop Image URL"]`)?.value?.trim() || ""
-                if (backdropUrl) updateBackdrop(backdropUrl)
-                setItemData(itemId, "bu", backdropUrl).catch((err) => {
-                    console.error("Failed to set backdrop URL:", err)
+                const imageUrl = document.querySelector(`input[placeholder="${modeName} Image URL"]`)?.value?.trim() || ""
+                if (imageUrl) updateImage(imageUrl, mode)
+                setItemData(itemId, imageUrlKey, imageUrl).catch((err) => {
+                    console.error(`Failed to set ${modeName} URL:`, err)
                 })
             }
 
             document.body.removeChild(overlay)
             // Remove the no-scroll class from the body
-            document.body.classList.remove("lcb-no-scroll")
+            document.body.classList.remove("lci-no-scroll")
         }
 
         // Exit if TMDB API key is not configured
@@ -532,7 +543,7 @@
 
         // Show loading spinner
         const spinner = document.createElement("div")
-        spinner.id = "lcb-loading-spinner"
+        spinner.id = "lci-loading-spinner"
         popup.appendChild(spinner)
 
         let filmId, tmdbIdType, tmdbId
@@ -549,7 +560,7 @@
                     filmId = targetedFilmId
                 }
             } else if (itemId.startsWith("f/")) {
-                // "Set film backdrop" context menu
+                // "Set film backdrop/poster" context menu
                 const itemTmdbId = await getItemData(itemId, "tId")
                 if (itemTmdbId) {
                     filmId = itemId
@@ -580,16 +591,17 @@
             }
 
             const imageGrid = document.createElement("div")
-            imageGrid.id = "lcb-image-grid"
+            imageGrid.id = "lci-image-grid"
+            if (mode === "poster") imageGrid.className = "lci-poster-grid"
             popup.appendChild(imageGrid)
 
             const loadMoreButton = document.createElement("button")
-            loadMoreButton.id = "lcb-load-more"
+            loadMoreButton.id = "lci-load-more"
             loadMoreButton.textContent = "Load more"
             loadMoreButton.onclick = () => loadMoreImages()
             popup.appendChild(loadMoreButton)
 
-            async function getAllTmdbBackdrops(tmdbIdType, tmdbId) {
+            async function getAllTmdbImages(tmdbIdType, tmdbId) {
                 try {
                     const tmdbRawRes = await fetch(
                         `https://api.themoviedb.org/3/${tmdbIdType}/${tmdbId}/images?api_key=${getConfigData("TMDB_API_KEY")}`
@@ -605,7 +617,7 @@
                     const nonLocaleImages = []
                     const localeImages = []
 
-                    tmdbRes.backdrops?.forEach((image) => {
+                    tmdbRes[mode === "poster" ? "posters" : "backdrops"]?.forEach((image) => {
                         if (image.iso_639_1 === null) {
                             nonLocaleImages.push(image.file_path)
                         } else {
@@ -613,16 +625,16 @@
                         }
                     })
 
-                    return [...nonLocaleImages, ...localeImages]
+                    return mode === "poster" ? [...localeImages, ...nonLocaleImages] : [...nonLocaleImages, ...localeImages]
                 } catch (error) {
-                    console.error("Error in getAllTmdbBackdrops:", error)
+                    console.error("Error in getAllTmdbImages:", error)
                     return []
                 }
             }
 
-            let allImageUrls = await getAllTmdbBackdrops(tmdbIdType, tmdbId)
+            let allImageUrls = await getAllTmdbImages(tmdbIdType, tmdbId)
             let currentRow = 0
-            const columnsToLoad = isMobile ? 1 : 3
+            const columnsToLoad = isMobile ? 1 : mode === "poster" ? 5 : 3
             const rowsToLoad = 15 / columnsToLoad
 
             // Remove spinner and load images
@@ -632,20 +644,21 @@
             async function loadMoreImages() {
                 const nextImages = allImageUrls.slice(currentRow * columnsToLoad, (currentRow + rowsToLoad) * columnsToLoad)
                 nextImages.forEach((file_path) => {
-                    const imageItem = document.createElement("div")
-                    imageItem.className = "lcb-image-item"
+                    const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
 
-                    const backdropUrl = `https://image.tmdb.org/t/p/original${file_path}`
+                    const imageItem = document.createElement("div")
+                    imageItem.className = "lci-image-item"
+                    if (imageUrl === input.value) imageItem.style.borderColor = "#40bcf4"
 
                     const img = document.createElement("img")
-                    img.src = backdropUrl.replace("original", "w500_and_h282_face")
+                    img.src = imageUrl.replace("original", mode === "poster" ? "w342" : "w780")
                     imageItem.appendChild(img)
 
                     imageItem.onclick = () => {
                         hasInputValueChanged = false
-                        updateBackdrop(backdropUrl)
-                        setItemData(itemId, "bu", backdropUrl).catch((err) => {
-                            console.error("Failed to set backdrop URL:", err)
+                        updateImage(imageUrl, mode)
+                        setItemData(itemId, imageUrlKey, imageUrl).catch((err) => {
+                            console.error(`Failed to set ${modeName} URL:`, err)
                         })
                         closePopup(overlay)
                     }
@@ -665,17 +678,17 @@
 
     function showSettingsPopup() {
         // Add the no-scroll class to the body
-        document.body.classList.add("lcb-no-scroll")
+        document.body.classList.add("lci-no-scroll")
 
         // Create overlay for the settings popup
         const overlay = document.createElement("div")
-        overlay.id = "lcb-settings-overlay"
+        overlay.id = "lci-settings-overlay"
         overlay.onclick = (e) => {
             if (e.target === overlay) closePopup(overlay)
         }
 
         const popup = document.createElement("div")
-        popup.id = "lcb-settings-popup"
+        popup.id = "lci-settings-popup"
 
         // Helper function to create label elements
         function createLabelElement(text) {
@@ -704,7 +717,7 @@
         // Helper function to create checkbox elements
         function createCheckboxElement(labelText, id) {
             const container = document.createElement("div")
-            container.className = "lcb-checkbox-container"
+            container.className = "lci-checkbox-container"
 
             const checkbox = document.createElement("input")
             checkbox.type = "checkbox"
@@ -741,7 +754,7 @@
                 const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2))
                 const downloadAnchor = document.createElement("a")
                 downloadAnchor.setAttribute("href", dataStr)
-                downloadAnchor.setAttribute("download", "lcbSettings.json")
+                downloadAnchor.setAttribute("download", "lciSettings.json")
                 document.body.appendChild(downloadAnchor)
                 downloadAnchor.click()
                 document.body.removeChild(downloadAnchor)
@@ -843,7 +856,7 @@
         function closePopup(overlay) {
             document.body.removeChild(overlay)
             // Remove the no-scroll class from the body
-            document.body.classList.remove("lcb-no-scroll")
+            document.body.classList.remove("lci-no-scroll")
         }
     }
 
@@ -956,7 +969,7 @@
                 await setItemData(filmId, "tId", tmdbId)
             }
 
-            if (!filmBackdropUrl && !document.querySelector(`#lcb-settings-popup[type="burlpopup"]`) && shouldScrape) {
+            if (!filmBackdropUrl && !document.querySelector(`#lci-settings-popup[type="imageurlpopup"]`) && shouldScrape) {
                 return await getTmdbBackdrop(tmdbIdType, tmdbId)
             }
 
@@ -1017,6 +1030,16 @@
         }
     }
 
+    function injectPoster(posterImageElement, imageUrl) {
+        let posterSize = posterImageElement.src.includes("0-70-0-105-crop") ? "w154" : "original"
+        posterSize = posterImageElement.src.includes("0-150-0-225-crop") ? "w342" : posterSize
+        posterSize = posterImageElement.src.includes("0-230-0-345-crop") ? "w500" : posterSize
+
+        imageUrl = imageUrl.replace("original", posterSize)
+        posterImageElement.src = imageUrl
+        posterImageElement.srcset = imageUrl
+    }
+
     function injectBackdrop(header, backdropUrl, attributes = []) {
         try {
             // Get or inject backdrop containers
@@ -1057,21 +1080,21 @@
                 const activityLink = menu.querySelector(".fm-show-activity a")
                 const filmName = activityLink.href.match(/\/film\/([^\/]+)/)?.[1]
 
-                const backdropItem = document.createElement("li")
-                backdropItem.classList.add(className, "popmenu-textitem", "-centered")
+                const imageMenuItem = document.createElement("li")
+                imageMenuItem.classList.add(className, "popmenu-textitem", "-centered")
 
-                const backdropLink = document.createElement("a")
-                backdropLink.style.cursor = "pointer"
-                backdropLink.textContent = name
-                backdropItem.onclick = () => {
+                const imageMenuLinkItem = document.createElement("a")
+                imageMenuLinkItem.style.cursor = "pointer"
+                imageMenuLinkItem.textContent = name
+                imageMenuItem.onclick = () => {
                     menu.setAttribute("hidden", "")
                     onClick(filmName, itemId)
                 }
 
-                backdropItem.appendChild(backdropLink)
+                imageMenuItem.appendChild(imageMenuLinkItem)
 
                 const activityItem = menu.querySelector(".fm-show-activity")
-                activityItem.parentNode.insertBefore(backdropItem, activityItem)
+                activityItem.parentNode.insertBefore(imageMenuItem, activityItem)
             } catch (error) {
                 console.error("Error adding film option to context menu:", error) // General error catch
             }
@@ -1101,6 +1124,12 @@
                                     name: "Set film backdrop",
                                     onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
                                 })
+                                addFilmOption({
+                                    menu: node,
+                                    className: "fm-set-film-poster",
+                                    name: "Set film poster",
+                                    onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}`, mode: "poster" }),
+                                })
                             }
                         })
                     }
@@ -1114,18 +1143,18 @@
         }
     }
 
-    async function filmPageMenuInjector(filmId) {
+    async function filmPageMenuInjector({ filmId, mode } = {}) {
         const yourActivityMenuItem = await waitForElement(`ul.js-actions-panel > li:has(a[href*="/activity/"])`, 2000)
 
-        const setFilmBackdropMenuItem = document.createElement("li")
+        const setFilmImageMenuItem = document.createElement("li")
 
         const anchor = document.createElement("a")
-        anchor.textContent = "Set film backdrop"
+        anchor.textContent = `Set film ${mode}`
         anchor.style.cursor = "pointer"
-        anchor.onclick = () => showImageUrlPopup({ itemId: filmId })
+        anchor.onclick = () => showImageUrlPopup({ itemId: filmId, mode })
 
-        setFilmBackdropMenuItem.appendChild(anchor)
-        yourActivityMenuItem.parentNode.insertBefore(setFilmBackdropMenuItem, yourActivityMenuItem)
+        setFilmImageMenuItem.appendChild(anchor)
+        yourActivityMenuItem.parentNode.insertBefore(setFilmImageMenuItem, yourActivityMenuItem)
     }
 
     async function filmPageInjector() {
@@ -1133,7 +1162,8 @@
             const filmId = `f/${location.pathname.split("/")?.[2]}`
 
             const header = await waitForElement("#header")
-            filmPageMenuInjector(filmId)
+            filmPageMenuInjector({ filmId, mode: "backdrop" })
+            filmPageMenuInjector({ filmId, mode: "poster" })
             injectContextMenuToAllFilmPosterItems()
 
             const cacheBackdrop = await getItemData(filmId, "bu")
@@ -1372,7 +1402,8 @@
 
             const cacheBackdrop = await getItemData(filmId, "bu")
             const header = await waitForElement("#header")
-            filmPageMenuInjector(filmId)
+            filmPageMenuInjector({ filmId, mode: "backdrop" })
+            filmPageMenuInjector({ filmId, mode: "poster" })
             injectContextMenuToAllFilmPosterItems()
 
             if (cacheBackdrop) {
@@ -1396,6 +1427,32 @@
         }
     }
 
+    async function injectPosters() {
+        const content = await waitForElement("#content")
+
+        const observer = new MutationObserver(async () => {
+            const allPosterImageElements = content.querySelectorAll(`.film-poster .image:not([poster-processed])`)
+
+            for (const posterImageElement of allPosterImageElements) {
+                const filmPath = posterImageElement.parentElement?.parentElement?.getAttribute("data-film-link")
+                if (!filmPath) continue
+
+                // Mark the element as processed to avoid reprocessing
+                posterImageElement.setAttribute("poster-processed", "")
+
+                const filmId = `f/${filmPath?.match(/\/film\/([^\/]+)/)?.[1] || ""}`
+                const cachePoster = await getItemData(filmId, "pu")
+
+                if (cachePoster) injectPoster(posterImageElement, cachePoster)
+            }
+        })
+
+        observer.observe(content, {
+            childList: true,
+            subtree: true,
+        })
+    }
+
     // MAIN
 
     try {
@@ -1408,6 +1465,8 @@
         const personPageRegex =
             /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
         const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
+
+        injectPosters()
 
         if (filmPageRegex.test(currentURL)) {
             currentPage = "film"
