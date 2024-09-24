@@ -10,11 +10,7 @@ All the customization this userscript provides is local and won't be visible to 
 2. Then, [click here and press install](https://tetrax-10.github.io/letterboxd-custom-images/lci.user.js).
 3. Done! 🎉
 
-<br>
-
 ### Screenshots
-
-#### Menu
 
 ![menu.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-images/main/screenshots/menu.jpg)
 
@@ -46,7 +42,7 @@ To open settings, click on the tampermonkey icon in your browser and click the g
 
 ### Screenshots of settings menu
 
-![settings menu](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-images/main/screenshots/settings_menu.jpg)
+![settings_menu.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-images/main/screenshots/settings_menu.jpg)
 
 ### Screenshots of image chooser
 
