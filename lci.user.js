@@ -273,7 +273,7 @@
                         switch (dataType) {
                             case "pu":
                             case "bu":
-                                if (value.startsWith("https://image.tmdb.org/t/p/original")) {
+                                if (value.startsWith("https://image.tmdb.org/t/p/")) {
                                     const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
                                     if (id) data[dataType] = `t/${id}`
                                 } else {
@@ -1157,7 +1157,7 @@
     }
 
     async function filmPageMenuInjector({ filmId, mode } = {}) {
-        const yourActivityMenuItem = await waitForElement(`ul.js-actions-panel > li:has(a[href*="/activity/"])`, 2000)
+        const yourActivityMenuItem = await waitForElement(`ul.js-actions-panel > li:has(a[href*="/activity/"])`, 5000)
 
         const setFilmImageMenuItem = document.createElement("li")
 
@@ -1227,7 +1227,7 @@
     }
 
     async function userPageMenuInjector(userId, filmElementSelector) {
-        const copyLinkMenuItem = await waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 2000)
+        const copyLinkMenuItem = await waitForElement(`.menuitem:has(> button[data-menuitem-trigger="clipboard"])`, 5000)
 
         const setUserBackdropMenuItem = document.createElement("div")
         setUserBackdropMenuItem.classList.add("menuitem", "-trigger", "-has-icon", "js-menuitem")
@@ -1296,7 +1296,7 @@
     }
 
     async function listPageMenuInjector(listId, filmElementSelector) {
-        const likeMenuItem = await waitForElement("li.like-link-target", 2000)
+        const likeMenuItem = await waitForElement("li.like-link-target", 5000)
 
         const setListBackdropMenuItem = document.createElement("li")
 
@@ -1349,7 +1349,7 @@
     }
 
     async function personPageMenuInjector(personId, filmElementSelector) {
-        const personImageElement = await waitForElement(".person-image", 2000)
+        const personImageElement = await waitForElement(".person-image", 5000)
 
         const setPersonBackdropButton = document.createElement("button")
         setPersonBackdropButton.style.borderRadius = "4px"
@@ -1447,7 +1447,8 @@
             const allPosterImageElements = content.querySelectorAll(`.film-poster .image:not([poster-processed])`)
 
             for (const posterImageElement of allPosterImageElements) {
-                const filmPath = posterImageElement.parentElement?.parentElement?.getAttribute("data-film-link")
+                const filmPath =
+                    posterImageElement.nextElementSibling?.href || posterImageElement.parentElement?.parentElement?.getAttribute("data-film-link")
                 if (!filmPath) continue
 
                 // Mark the element as processed to avoid reprocessing
