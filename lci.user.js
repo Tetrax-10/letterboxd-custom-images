@@ -437,17 +437,6 @@
         .lci-image-item:hover {
             border-color: #4caf50;
         }
-        #lci-load-more {
-            background-color: #4caf50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 20px;
-            align-self: center;
-        }
         #lci-loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -595,12 +584,6 @@
             if (mode === "poster") imageGrid.className = "lci-poster-grid"
             popup.appendChild(imageGrid)
 
-            const loadMoreButton = document.createElement("button")
-            loadMoreButton.id = "lci-load-more"
-            loadMoreButton.textContent = "Load more"
-            loadMoreButton.onclick = () => loadMoreImages()
-            popup.appendChild(loadMoreButton)
-
             async function getAllTmdbImages(tmdbIdType, tmdbId) {
                 try {
                     const tmdbRawRes = await fetch(
@@ -652,11 +635,11 @@
             const columnsToLoad = isMobile ? 1 : mode === "poster" ? 5 : 3
             const rowsToLoad = 15 / columnsToLoad
 
-            // Remove spinner and load images
-            await loadMoreImages()
+            // Remove spinner and load initial images
+            await loadImages()
             spinner.remove()
 
-            async function loadMoreImages() {
+            async function loadImages() {
                 const nextImages = allImageUrls.slice(currentRow * columnsToLoad, (currentRow + rowsToLoad) * columnsToLoad)
                 nextImages.forEach((file_path) => {
                     const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
@@ -681,12 +664,27 @@
                 })
 
                 currentRow += rowsToLoad
-                if (currentRow * columnsToLoad >= allImageUrls.length) {
-                    loadMoreButton.style.display = "none"
-                }
             }
+
+            // Auto-load more images when scrolling to the bottom using IntersectionObserver
+            const observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    if (currentRow * columnsToLoad < allImageUrls.length) {
+                        loadImages()
+                    } else {
+                        // Disconnect the observer when all images are loaded
+                        observer.disconnect()
+                    }
+                }
+            })
+
+            // Create a sentinel element at the bottom of the image grid to trigger loading
+            const sentinel = document.createElement("div")
+            sentinel.id = "lci-sentinel"
+            popup.appendChild(sentinel)
+
+            observer.observe(sentinel)
         } catch (error) {
-            // General error catch
             console.error("An error occurred while setting up the image URL popup:", error)
         }
     }
