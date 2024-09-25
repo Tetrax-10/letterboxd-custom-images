@@ -614,18 +614,33 @@
 
                     const tmdbRes = await tmdbRawRes.json()
 
-                    const nonLocaleImages = []
-                    const localeImages = []
+                    const images = tmdbRes[mode === "poster" ? "posters" : "backdrops"] || []
 
-                    tmdbRes[mode === "poster" ? "posters" : "backdrops"]?.forEach((image) => {
+                    const localeImages = []
+                    const nonLocaleImages = []
+
+                    images.forEach((image) => {
                         if (image.iso_639_1 === null) {
                             nonLocaleImages.push(image.file_path)
                         } else {
-                            localeImages.push(image.file_path)
+                            localeImages.push(image)
                         }
                     })
 
-                    return mode === "poster" ? [...localeImages, ...nonLocaleImages] : [...nonLocaleImages, ...localeImages]
+                    const postersByLanguage = localeImages.reduce((acc, image) => {
+                        const language = image.iso_639_1
+                        if (!acc[language]) acc[language] = []
+                        acc[language].push(image.file_path)
+                        return acc
+                    }, {})
+
+                    const sortedLanguages = Object.keys(postersByLanguage).sort((a, b) => {
+                        return postersByLanguage[b].length - postersByLanguage[a].length
+                    })
+
+                    const sortedLocaleImages = sortedLanguages.flatMap((language) => postersByLanguage[language])
+
+                    return mode === "poster" ? [...sortedLocaleImages, ...nonLocaleImages] : [...nonLocaleImages, ...sortedLocaleImages]
                 } catch (error) {
                     console.error("Error in getAllTmdbImages:", error)
                     return []
