@@ -1441,10 +1441,10 @@
     }
 
     async function injectPosters() {
-        const content = await waitForElement("#content")
+        await waitForElement("body")
 
         const observer = new MutationObserver(async () => {
-            const allPosterImageElements = content.querySelectorAll(`.film-poster .image:not([poster-processed])`)
+            const allPosterImageElements = document.querySelectorAll(`.film-poster .image:not([poster-processed])`)
 
             for (const posterImageElement of allPosterImageElements) {
                 const filmPath =
@@ -1461,7 +1461,7 @@
             }
         })
 
-        observer.observe(content, {
+        observer.observe(document.body, {
             childList: true,
             subtree: true,
         })
