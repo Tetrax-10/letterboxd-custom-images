@@ -1086,67 +1086,58 @@
     async function injectContextMenuToAllFilmPosterItems({ itemId, name } = {}) {
         if (isMobile) return
 
-        function addFilmOption({ menu, className, name, onClick = () => {}, itemId = undefined } = {}) {
+        function addFilmOption({ contextmenu, className, name, onClick = () => {}, itemId = undefined } = {}) {
             try {
-                if (menu.querySelector(`.${className}`)) return
+                const activityMenuElement = contextmenu.querySelector(".fm-show-activity")
+                const filmName = activityMenuElement?.firstElementChild?.href?.match(/\/film\/([^\/]+)/)?.[1]
 
-                const activityLink = menu.querySelector(".fm-show-activity a")
-                const filmName = activityLink.href.match(/\/film\/([^\/]+)/)?.[1]
+                const imageMenuElement = document.createElement("li")
+                imageMenuElement.classList.add(className, "popmenu-textitem", "-centered")
 
-                const imageMenuItem = document.createElement("li")
-                imageMenuItem.classList.add(className, "popmenu-textitem", "-centered")
-
-                const imageMenuLinkItem = document.createElement("a")
-                imageMenuLinkItem.style.cursor = "pointer"
-                imageMenuLinkItem.textContent = name
-                imageMenuItem.onclick = () => {
-                    menu.setAttribute("hidden", "")
+                const imageMenuLinkElement = document.createElement("a")
+                imageMenuLinkElement.style.cursor = "pointer"
+                imageMenuLinkElement.textContent = name
+                imageMenuElement.onclick = () => {
+                    contextmenu.setAttribute("hidden", "")
                     onClick(filmName, itemId)
                 }
 
-                imageMenuItem.appendChild(imageMenuLinkItem)
-
-                const activityItem = menu.querySelector(".fm-show-activity")
-                activityItem.parentNode.insertBefore(imageMenuItem, activityItem)
+                imageMenuElement.appendChild(imageMenuLinkElement)
+                activityMenuElement.parentNode.insertBefore(imageMenuElement, activityMenuElement)
             } catch (error) {
                 console.error("Error adding film option to context menu:", error) // General error catch
             }
         }
 
         try {
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === "childList") {
-                        mutation.addedNodes.forEach((node) => {
-                            if (
-                                node.nodeType === Node.ELEMENT_NODE &&
-                                node.matches(`body > .popmenu.film-poster-popmenu:has(>ul >li >a[href*="/film/"])`)
-                            ) {
-                                if (itemId) {
-                                    addFilmOption({
-                                        menu: node,
-                                        className: "fm-set-as-backdrop",
-                                        name: `Set as ${name} backdrop`,
-                                        onClick: (filmName, itemId) => showImageUrlPopup({ itemId: itemId, targetedFilmId: `f/${filmName}` }),
-                                        itemId: itemId,
-                                    })
-                                }
-                                addFilmOption({
-                                    menu: node,
-                                    className: "fm-set-film-backdrop",
-                                    name: "Set film backdrop",
-                                    onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
-                                })
-                                addFilmOption({
-                                    menu: node,
-                                    className: "fm-set-film-poster",
-                                    name: "Set film poster",
-                                    onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}`, mode: "poster" }),
-                                })
-                            }
+            const observer = new MutationObserver(() => {
+                if (!document.querySelector("body > .popmenu.film-poster-popmenu:not([contextmenu-processed])")) return
+
+                const allContextmenu = document.querySelectorAll(`body > .popmenu.film-poster-popmenu:not([contextmenu-processed])`)
+                for (const contextmenu of allContextmenu) {
+                    contextmenu.setAttribute("contextmenu-processed", "")
+                    if (itemId) {
+                        addFilmOption({
+                            contextmenu,
+                            className: "fm-set-as-item-backdrop",
+                            name: `Set as ${name} backdrop`,
+                            onClick: (filmName, itemId) => showImageUrlPopup({ itemId: itemId, targetedFilmId: `f/${filmName}` }),
+                            itemId: itemId,
                         })
                     }
-                })
+                    addFilmOption({
+                        contextmenu,
+                        className: "fm-set-film-backdrop",
+                        name: "Set film backdrop",
+                        onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}` }),
+                    })
+                    addFilmOption({
+                        contextmenu,
+                        className: "fm-set-film-poster",
+                        name: "Set film poster",
+                        onClick: (filmName) => showImageUrlPopup({ itemId: `f/${filmName}`, mode: "poster" }),
+                    })
+                }
             })
 
             await waitForElement("body")
