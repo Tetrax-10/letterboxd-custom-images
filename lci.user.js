@@ -1444,17 +1444,20 @@
         await waitForElement("body")
 
         const observer = new MutationObserver(async () => {
-            const allPosterImageElements = document.querySelectorAll(`.film-poster .image:not([poster-processed])`)
+            if (!document.querySelector(".film-poster:not([poster-processed])")) return
 
+            const allPosterImageElements = document.querySelectorAll(`.film-poster:not([poster-processed]) .image`)
             for (const posterImageElement of allPosterImageElements) {
-                const filmPath =
-                    posterImageElement.nextElementSibling?.href || posterImageElement.parentElement?.parentElement?.getAttribute("data-film-link")
-                if (!filmPath) continue
+                // Get the film name
+                const posterElement = posterImageElement.parentElement?.parentElement
+                const filmPath = posterImageElement.nextElementSibling?.href || posterElement?.getAttribute("data-film-link")
+                const filmName = filmPath?.match(/\/film\/([^\/]+)/)?.[1] || ""
+                if (!filmName) continue
 
                 // Mark the element as processed to avoid reprocessing
-                posterImageElement.setAttribute("poster-processed", "")
+                posterElement?.setAttribute("poster-processed", "")
 
-                const filmId = `f/${filmPath?.match(/\/film\/([^\/]+)/)?.[1] || ""}`
+                const filmId = `f/${filmName}`
                 const cachePoster = await getItemData(filmId, "pu")
 
                 if (cachePoster) injectPoster(posterImageElement, cachePoster)
