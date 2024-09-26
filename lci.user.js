@@ -3,7 +3,7 @@
 // @description  Customize letterboxd posters and backdrops without letterboxd PATRON
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-images
-// @version      4.0
+// @version      4.1
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
