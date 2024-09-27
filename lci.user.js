@@ -324,7 +324,7 @@
             overflow: hidden;
         }
         #lci-settings-popup {
-            background-color: #20242c;
+            background-color: rgb(32, 36, 44);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -350,21 +350,21 @@
             overflow: hidden;
         }
         #lci-settings-popup label {
-            color: #cfcfcf;
+            color: rgb(207, 207, 207);
             font-weight: bold;
             font-size: 1.2em;
             margin-bottom: 10px;
         }
         #lci-settings-popup input {
-            background-color: #20242c;
-            border: 1px solid #cfcfcf;
-            color: #cfcfcf;
+            background-color: rgb(32, 36, 44);
+            border: 1px solid rgb(207, 207, 207);
+            color: rgb(207, 207, 207);
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 10px;
         }
         #lci-settings-popup button {
-            background-color: #4caf50;
+            background-color: rgb(76, 175, 80);
             color: white;
             padding: 10px;
             border: none;
@@ -384,8 +384,8 @@
         }
         .lci-checkbox-container input[type="checkbox"] {
             appearance: none;
-            background-color: #20242c;
-            border: 1px solid #cfcfcf;
+            background-color: rgb(32, 36, 44);
+            border: 1px solid rgb(207, 207, 207);
             border-radius: 4px;
             width: 20px;
             height: 20px;
@@ -395,7 +395,7 @@
             outline: none;
         }
         .lci-checkbox-container input[type="checkbox"]:checked {
-            background-color: #4caf50;
+            background-color: rgb(76, 175, 80);
             border: none;
         }
         .lci-checkbox-container input[type="checkbox"]:checked::after {
@@ -408,7 +408,7 @@
             transform: translate(-50%, -50%);
         }
         .lci-checkbox-container label {
-            color: #cfcfcf;
+            color: rgb(207, 207, 207);
             font-weight: bold;
             font-size: 1.2em;
         }
@@ -435,12 +435,34 @@
             display: block;
         }
         .lci-image-item:hover {
-            border-color: #4caf50;
+            border-color: rgb(76, 175, 80);
+        }
+        .lci-tooltip {
+            visibility: hidden;
+            background-color: rgba(32, 36, 44, 0.8);
+            color: white;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 4px;
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: auto;
+            white-space: nowrap;
+            font-size: 0.9em;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .lci-image-item:hover .lci-tooltip {
+            visibility: visible;
+            opacity: 1;
         }
         #lci-loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            border-top: 4px solid #4caf50;
+            border-top: 4px solid rgb(76, 175, 80);
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
@@ -602,21 +624,24 @@
                     const localeImages = []
                     const nonLocaleImages = []
 
+                    // Separate images into locale and non-locale
                     images.forEach((image) => {
-                        if (image.iso_639_1 === null) {
-                            nonLocaleImages.push(image.file_path)
+                        if (!image.iso_639_1) {
+                            nonLocaleImages.push(image)
                         } else {
                             localeImages.push(image)
                         }
                     })
 
+                    // Group images by language
                     const postersByLanguage = localeImages.reduce((acc, image) => {
                         const language = image.iso_639_1
                         if (!acc[language]) acc[language] = []
-                        acc[language].push(image.file_path)
+                        acc[language].push(image)
                         return acc
                     }, {})
 
+                    // Sort images by number of images in each language
                     const sortedLanguages = Object.keys(postersByLanguage).sort((a, b) => {
                         return postersByLanguage[b].length - postersByLanguage[a].length
                     })
@@ -641,8 +666,8 @@
 
             async function loadImages() {
                 const nextImages = allImageUrls.slice(currentRow * columnsToLoad, (currentRow + rowsToLoad) * columnsToLoad)
-                nextImages.forEach((file_path) => {
-                    const imageUrl = `https://image.tmdb.org/t/p/original${file_path}`
+                nextImages.forEach((image) => {
+                    const imageUrl = `https://image.tmdb.org/t/p/original${image.file_path}`
 
                     const imageItem = document.createElement("div")
                     imageItem.className = "lci-image-item"
@@ -651,6 +676,14 @@
                     const img = document.createElement("img")
                     img.src = imageUrl.replace("original", mode === "poster" ? "w342" : "w780")
                     imageItem.appendChild(img)
+
+                    // Create tooltip with image metadata
+                    const tooltip = document.createElement("div")
+                    tooltip.className = "lci-tooltip"
+                    tooltip.textContent = `${image.width && image.height ? `${image.width} × ${image.height}` : ""}${
+                        image.iso_639_1 ? ` • ${image.iso_639_1}` : ""
+                    }`
+                    if (tooltip.textContent) imageItem.appendChild(tooltip)
 
                     imageItem.onclick = () => {
                         hasInputValueChanged = false
