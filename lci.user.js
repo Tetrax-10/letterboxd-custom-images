@@ -273,7 +273,7 @@
                         switch (dataType) {
                             case "pu":
                             case "bu":
-                                if (value.startsWith("https://image.tmdb.org/t/p/")) {
+                                if (value.includes(".org/t/p/")) {
                                     const id = value.match(/\/([^\/]+)\.jpg$/)?.[1] ?? ""
                                     if (id) data[dataType] = `t/${id}`
                                 } else {
