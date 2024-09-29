@@ -8,7 +8,8 @@ All the customization this userscript provides is local and won't be visible to 
 
 1. Install the [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en) extension.
 2. Then, [click here and press install](https://tetrax-10.github.io/letterboxd-custom-images/lci.user.js).
-3. Done! 🎉
+3. [Open settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-images/main/screenshots/script_settings.jpg) and enter your TMDB API key (used by [image chooser](#screenshots-of-image-chooser) but optional).
+4. Done! 🎉
 
 ### Screenshots
 
