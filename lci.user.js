@@ -3,7 +3,7 @@
 // @description  Customize letterboxd posters and backdrops without letterboxd PATRON
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-images
-// @version      4.2
+// @version      4.3
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
@@ -1002,9 +1002,9 @@
             // Get TMDB ID and type
             let tmdbElement
             if (dom) {
-                tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDb"]`)
+                tmdbElement = dom.querySelector(`.micro-button.track-event[data-track-action="TMDB"]`)
             } else {
-                tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+                tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDB"]`, 5000)
             }
 
             const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
@@ -1208,7 +1208,7 @@
             async function scrapeTmdbIdAndType() {
                 try {
                     // Extracts TMDB ID and type
-                    const tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDb"]`, 5000)
+                    const tmdbElement = await waitForElement(`.micro-button.track-event[data-track-action="TMDB"]`, 5000)
                     const tmdbIdType = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[1] ?? null
                     const tmdbId = tmdbElement.href?.match(/\/(movie|tv)\/(\d+)\//)?.[2] ?? null
 
