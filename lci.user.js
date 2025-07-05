@@ -3,7 +3,7 @@
 // @description  Customize letterboxd posters and backdrops without letterboxd PATRON
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-images
-// @version      4.3
+// @version      4.4
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
@@ -1504,7 +1504,7 @@
         const listPageRegex =
             /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/
         const personPageRegex =
-            /^(https?:\/\/letterboxd\.com\/(director|actor|producer|executive-producer|writer|cinematography|additional-photography|editor|sound|story|visual-effects)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
+            /^(https?:\/\/letterboxd\.com\/(actor|additional-directing|additional-photography|art-direction|assistant-director|camera-operator|casting|choreography|cinematography|co-director|composer|costume-design|director|editor|executive-producer|hairstyling|lighting|makeup|original-writer|producer|production-design|set-decoration|songs|sound|story|stunts|visual-effects|writer)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year|popular)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
         const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
 
         injectPosters()
