@@ -1121,7 +1121,7 @@
 
         function addFilmOption({ contextmenu, className, name, onClick = () => {}, itemId = undefined } = {}) {
             try {
-                const activityMenuElement = contextmenu.querySelector(".fm-show-activity")
+                const activityMenuElement = contextmenu.querySelector(`.popmenu-textitem:has(> a[href$="/activity/"])`)
                 const filmName = activityMenuElement?.firstElementChild?.href?.match(/\/film\/([^\/]+)/)?.[1]
 
                 const imageMenuElement = document.createElement("li")
@@ -1144,9 +1144,11 @@
 
         try {
             const observer = new MutationObserver(() => {
-                if (!document.querySelector("body > .popmenu.film-poster-popmenu:not([contextmenu-processed])")) return
+                const contextmenuSelector = "body > div > .popmenu.poster-popmenu:not([contextmenu-processed])"
 
-                const allContextmenu = document.querySelectorAll(`body > .popmenu.film-poster-popmenu:not([contextmenu-processed])`)
+                if (!document.querySelector(contextmenuSelector)) return
+
+                const allContextmenu = document.querySelectorAll(contextmenuSelector)
                 for (const contextmenu of allContextmenu) {
                     contextmenu.setAttribute("contextmenu-processed", "")
                     if (itemId) {
