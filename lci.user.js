@@ -61,8 +61,9 @@
         PERSON_AUTO_SCRAPE: false,
         PERSON_SHORT_BACKDROP: false,
 
-        REVIEW_AUTO_SCRAPE: false,
         REVIEW_SHORT_BACKDROP: true,
+        REPLACE_OTHER_NON_PATRON_REVIEW: false,
+        REPLACE_OTHER_PATRON_REVIEW: false,
     }
 
     // Initialize configuration with defaults if not already set
@@ -870,8 +871,9 @@
         createSpaceComponent()
 
         createLabelElement("Review Page:")
-        createCheckboxElement("Auto scrape backdrops", "REVIEW_AUTO_SCRAPE")
         createCheckboxElement("Short backdrops", "REVIEW_SHORT_BACKDROP")
+        createCheckboxElement("Use my custom backdrop on non-patron user's review", "REPLACE_OTHER_NON_PATRON_REVIEW")
+        createCheckboxElement("Use my custom backdrop on patron user's review", "REPLACE_OTHER_PATRON_REVIEW")
         createSpaceComponent()
 
         // Import/Export Buttons
@@ -1442,22 +1444,38 @@
             const filmId = `f/${filmName}`
             const filmElementSelector = `.film-poster a[href^="/film/"]`
 
+            const userName = location.pathname.split("/")?.[1]?.toLowerCase()
+            const isCurrentUser = userName === loggedInAs
+
             const cacheBackdrop = await getItemData(filmId, "bu")
             const header = await waitForElement("#header")
             filmPageMenuInjector({ filmId, mode: "backdrop" })
             filmPageMenuInjector({ filmId, mode: "poster" })
             injectContextMenuToAllFilmPosterItems()
 
-            if (cacheBackdrop) {
+            const defaultBackdropUrl = await isDefaultBackdropAvailable()
+
+            if (
+                cacheBackdrop &&
+                (isCurrentUser ||
+                    (!isCurrentUser && getConfigData("REPLACE_OTHER_NON_PATRON_REVIEW") && !defaultBackdropUrl) ||
+                    (!isCurrentUser && getConfigData("REPLACE_OTHER_PATRON_REVIEW") && defaultBackdropUrl))
+            ) {
                 injectBackdrop(header, cacheBackdrop, getConfigData("REVIEW_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
                 return
             }
 
-            if (await isDefaultBackdropAvailable()) return
+            if (defaultBackdropUrl && !getConfigData("REPLACE_OTHER_PATRON_REVIEW")) return
 
-            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("REVIEW_AUTO_SCRAPE"), filmId)
+            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, false, filmId)
 
-            if (scrapedImage) {
+            if (
+                scrapedImage &&
+                (isCurrentUser ||
+                    (!isCurrentUser &&
+                        ((getConfigData("REPLACE_OTHER_NON_PATRON_REVIEW") && !defaultBackdropUrl) ||
+                            (getConfigData("REPLACE_OTHER_NON_PATRON_REVIEW") && defaultBackdropUrl))))
+            ) {
                 injectBackdrop(header, scrapedImage, ["shortbackdropped", "-crop"])
 
                 if (!isCached) {
