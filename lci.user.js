@@ -56,7 +56,7 @@
 
         USER_AUTO_SCRAPE: false,
         USER_SHORT_BACKDROP: false,
-        CURRENT_USER_BACKDROP_ONLY: true,
+        OTHER_USER_NO_AUTO_SCRAPE: true,
 
         PERSON_AUTO_SCRAPE: false,
         PERSON_SHORT_BACKDROP: false,
@@ -861,7 +861,7 @@
         createLabelElement("User Page:")
         createCheckboxElement("Auto scrape backdrops", "USER_AUTO_SCRAPE")
         createCheckboxElement("Short backdrops", "USER_SHORT_BACKDROP")
-        createCheckboxElement("Don't scrape backdrops for other users", "CURRENT_USER_BACKDROP_ONLY")
+        createCheckboxElement("Don't auto scrape backdrops for other users", "OTHER_USER_NO_AUTO_SCRAPE")
         createSpaceComponent()
 
         createLabelElement("Person Page:")
@@ -1289,8 +1289,7 @@
             const userId = `u/${userName}`
             const filmElementSelector = "#favourites .poster-list > li:first-child a"
 
-            if (getConfigData("CURRENT_USER_BACKDROP_ONLY") && userName !== loggedInAs) return
-
+            const isCurrentUser = userName === loggedInAs
             const cacheBackdrop = await getItemData(userId, "bu")
             const header = await waitForElement("#header")
             userPageMenuInjector(userId, filmElementSelector)
@@ -1307,9 +1306,13 @@
                 return
             }
 
-            const [scrapedImage, isCached] = await scrapeFilmLinkElement(filmElementSelector, getConfigData("USER_AUTO_SCRAPE"), userId)
+            const [scrapedImage, isCached] = await scrapeFilmLinkElement(
+                filmElementSelector,
+                isCurrentUser ? getConfigData("USER_AUTO_SCRAPE") : !getConfigData("OTHER_USER_NO_AUTO_SCRAPE"),
+                userId
+            )
 
-            if (scrapedImage) {
+            if (scrapedImage && (isCurrentUser || (!isCurrentUser && !getConfigData("OTHER_USER_NO_AUTO_SCRAPE")))) {
                 injectBackdrop(header, scrapedImage, getConfigData("USER_SHORT_BACKDROP") ? ["shortbackdropped", "-crop"] : [])
 
                 if (!isCached) {
