@@ -527,7 +527,7 @@
 
         async function updateImage(imageUrl, mode) {
             if (mode === "poster") {
-                document.querySelectorAll(`.film-poster[data-film-link*="film/${itemId.slice(2)}"] .image`).forEach((posterImageElement) => {
+                document.querySelectorAll(`.film-poster[data-item-link*="film/${itemId.slice(2)}"] .image`).forEach((posterImageElement) => {
                     injectPoster(posterImageElement, imageUrl)
                 })
             } else if (mode === "backdrop" && currentPage !== "other") {
@@ -1497,7 +1497,7 @@
             for (const posterImageElement of allPosterImageElements) {
                 // Get the film name
                 const posterElement = posterImageElement.parentElement?.parentElement
-                const filmPath = posterImageElement.nextElementSibling?.href || posterElement?.getAttribute("data-film-link")
+                const filmPath = posterImageElement.nextElementSibling?.href || posterElement?.getAttribute("data-item-link")
                 const filmName = filmPath?.match(/\/film\/([^\/]+)/)?.[1] || ""
                 if (!filmName) continue
 
