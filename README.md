@@ -11,6 +11,12 @@ All the customization this userscript provides is local and won't be visible to 
 3. [Open settings](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-images/main/screenshots/script_settings.jpg) and enter your TMDB API key (used by [image chooser](#screenshots-of-image-chooser) but optional).
 4. Done! 🎉
 
+> [!NOTE]
+>
+> If you are on chromium based browser (i.e chrome, edge, opera, brave etc...) Make sure to enable developer mode.
+> 
+> If you don't know how, watch this 2 mins [youtube video](https://youtu.be/pJEwz2rq90I?si=zyIG6ORFF1bXeA5S&t=50).
+
 ### Screenshots
 
 ![menu.jpg](https://raw.githubusercontent.com/Tetrax-10/letterboxd-custom-images/main/screenshots/menu.jpg)
