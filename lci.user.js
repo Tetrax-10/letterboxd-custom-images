@@ -3,7 +3,7 @@
 // @description  Customize letterboxd posters and backdrops without letterboxd PATRON
 // @author       Tetrax-10
 // @namespace    https://github.com/Tetrax-10/letterboxd-custom-images
-// @version      4.6
+// @version      4.7
 // @license      MIT
 // @match        *://*.letterboxd.com/*
 // @connect      themoviedb.org
@@ -27,6 +27,16 @@
     GM_registerMenuCommand("Settings", showSettingsPopup)
 
     let currentPage = null
+
+    const currentURL = location.protocol + "//" + location.hostname + location.pathname
+
+    const filmPageRegex = /^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/
+    const userPageRegex = /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/
+    const listPageRegex =
+        /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/
+    const personPageRegex =
+        /^(https?:\/\/letterboxd\.com\/(actor|additional-directing|additional-photography|art-direction|assistant-director|camera-operator|casting|choreography|cinematography|co-director|composer|costume-design|director|editor|executive-producer|hairstyling|lighting|makeup|original-writer|producer|production-design|set-decoration|songs|sound|story|stunts|visual-effects|writer)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year|popular)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
+    const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
 
     // Retrieve logged-in username from cookies
     const loggedInAs =
@@ -1497,8 +1507,8 @@
             for (const posterImageElement of allPosterImageElements) {
                 // Get the film name
                 const posterElement = posterImageElement.parentElement?.parentElement
-                const filmPath = posterImageElement.nextElementSibling?.href || posterElement?.getAttribute("data-item-link")
-                const filmName = filmPath?.match(/\/film\/([^\/]+)/)?.[1] || ""
+                const filmPath = posterImageElement.nextElementSibling?.href || posterElement?.getAttribute("data-item-link") || (/^https?:\/\/letterboxd\.com\/[A-Za-z0-9_-]+\/list\/[A-Za-z0-9_-]+\/edit\/$/.test(currentURL) && posterImageElement.parentElement.nextElementSibling?.querySelector(".primaryname > a")?.href)
+                const filmName = filmPath?.match?.(/\/film\/([^\/]+)/)?.[1] || ""
                 if (!filmName) continue
 
                 // Mark the element as processed to avoid reprocessing
@@ -1520,16 +1530,6 @@
     // MAIN
 
     try {
-        const currentURL = location.protocol + "//" + location.hostname + location.pathname
-
-        const filmPageRegex = /^(https?:\/\/letterboxd\.com\/film\/[^\/]+\/?(crew|details|releases|genres)?\/)$/
-        const userPageRegex = /^(https?:\/\/letterboxd\.com\/[^\/]+(?:\/\?.*)?\/?)$/
-        const listPageRegex =
-            /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/list\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|detail|year)\/[A-Za-z0-9-_\/]+)?\/(?:(detail|page\/\d+)\/?)?)$/
-        const personPageRegex =
-            /^(https?:\/\/letterboxd\.com\/(actor|additional-directing|additional-photography|art-direction|assistant-director|camera-operator|casting|choreography|cinematography|co-director|composer|costume-design|director|editor|executive-producer|hairstyling|lighting|makeup|original-writer|producer|production-design|set-decoration|songs|sound|story|stunts|visual-effects|writer)\/[A-Za-z0-9-_]+(?:\/(by|language|country|decade|genre|on|year|popular)\/[A-Za-z0-9-_\/]+)?\/(?:page\/\d+\/?)?)$/
-        const reviewPageRegex = /^(https?:\/\/letterboxd\.com\/[A-Za-z0-9-_]+\/film\/[A-Za-z0-9-_]+\/(\d+\/)?(?:reviews\/?)?(?:page\/\d+\/?)?)$/
-
         injectPosters()
 
         if (filmPageRegex.test(currentURL)) {
